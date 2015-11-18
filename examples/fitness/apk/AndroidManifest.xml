@@ -8,6 +8,15 @@
     <uses-sdk android:minSdkVersion="14" android:targetSdkVersion="21" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- for GCM -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+    <!-- @@@MP need this? -->
+    <permission android:name="org.domokit.sky.shell.gcm.permission.C2D_MESSAGE"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="org.domokit.sky.shell.gcm.permission.C2D_MESSAGE" />
+    <!-- end for GCM -->
+
     <application android:icon="@mipmap/ic_launcher" android:label="Fitness" android:name="org.domokit.sky.shell.SkyApplication">
         <activity android:configChanges="orientation|keyboardHidden|keyboard|screenSize" android:hardwareAccelerated="true" android:launchMode="singleTask" android:name="org.domokit.sky.shell.SkyActivity" android:theme="@android:style/Theme.Black.NoTitleBar">
             <intent-filter>
@@ -19,5 +28,34 @@
             android:name="org.domokit.sky.shell.UpdateService"
             android:exported="false"
             android:process=":remote"/>
+
+        <!-- for GCM -->
+        <receiver
+            android:name="com.google.android.gms.gcm.GcmReceiver"
+            android:exported="true"
+            android:permission="com.google.android.c2dm.permission.SEND" >
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+                <category android:name="com.example.gcm" />
+            </intent-filter>
+        </receiver>
+        <service
+            android:name="org.domokit.sky.shell.MyGcmListenerService"
+            android:exported="false" >
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name="org.domokit.sky.shell.MyInstanceIDListenerService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.android.gms.iid.InstanceID"/>
+            </intent-filter>
+        </service>
+        <service
+            android:name="org.domokit.sky.shell.RegistrationIntentService"
+            android:exported="false">
+        </service>
     </application>
  </manifest>
