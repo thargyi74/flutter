@@ -4,9 +4,9 @@
 
 import 'dart:io';
 
-import 'package:flutter_tools/src/os_utils.dart';
+import 'package:flutter_tools/src/base/os.dart';
 import 'package:test/test.dart';
-import 'package:path/path.dart' as p;
+import 'package:path/path.dart' as path;
 
 main() => defineTests();
 
@@ -23,9 +23,9 @@ defineTests() {
     });
 
     test('makeExecutable', () {
-      File file = new File(p.join(temp.path, 'foo.script'));
+      File file = new File(path.join(temp.path, 'foo.script'));
       file.writeAsStringSync('hello world');
-      osUtils.makeExecutable(file);
+      os.makeExecutable(file);
 
       // Skip this test on windows.
       if (!Platform.isWindows) {

@@ -5,9 +5,9 @@
 import 'box.dart';
 import 'object.dart';
 
-class StatisticsBox extends RenderBox {
+class RenderStatisticsBox extends RenderBox {
 
-  StatisticsBox({int optionsMask: 0, int rasterizerThreshold: 0})
+  RenderStatisticsBox({int optionsMask: 0, int rasterizerThreshold: 0})
     : _optionsMask = optionsMask,
       _rasterizerThreshold = rasterizerThreshold;
 
@@ -54,6 +54,6 @@ class StatisticsBox extends RenderBox {
   }
 
   void paint(PaintingContext context, Offset offset) {
-    context.paintStatistics(optionsMask, rasterizerThreshold, offset, size);
+    context.pushStatistics(offset, optionsMask, rasterizerThreshold, size);
   }
 }

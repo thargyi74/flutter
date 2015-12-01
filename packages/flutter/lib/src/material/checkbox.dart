@@ -7,13 +7,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
-import 'colors.dart';
+import 'constants.dart';
 import 'theme.dart';
-
-const double _kMidpoint = 0.5;
-const double _kEdgeSize = 18.0;
-const double _kEdgeRadius = 1.0;
-const double _kStrokeWidth = 2.0;
+import 'toggleable.dart';
 
 /// A material design checkbox
 ///
@@ -38,116 +34,87 @@ class Checkbox extends StatelessComponent {
   final bool value;
   final ValueChanged<bool> onChanged;
 
-  bool get enabled => onChanged != null;
-
   Widget build(BuildContext context) {
     ThemeData themeData = Theme.of(context);
-    if (enabled) {
-      Color uncheckedColor = themeData.brightness == ThemeBrightness.light
-          ? Colors.black54
-          : Colors.white70;
-      return new _CheckboxWrapper(
-        value: value,
-        onChanged: onChanged,
-        uncheckedColor: uncheckedColor,
-        accentColor: themeData.accentColor
-      );
-    }
-    Color disabledColor = themeData.brightness == ThemeBrightness.light
-        ? Colors.black26
-        : Colors.white30;
-    return new _CheckboxWrapper(
+    return new _CheckboxRenderObjectWidget(
       value: value,
-      uncheckedColor: disabledColor,
-      accentColor: disabledColor
+      activeColor: themeData.accentColor,
+      inactiveColor: onChanged != null ? themeData.unselectedColor : themeData.disabledColor,
+      onChanged: onChanged
     );
   }
 }
 
-// This wrapper class exists only because Switch needs to be a Component in
-// order to get an accent color from a Theme but Components do not know how to
-// host RenderObjects.
-class _CheckboxWrapper extends LeafRenderObjectWidget {
-  _CheckboxWrapper({
+class _CheckboxRenderObjectWidget extends LeafRenderObjectWidget {
+  _CheckboxRenderObjectWidget({
     Key key,
     this.value,
-    this.onChanged,
-    this.uncheckedColor,
-    this.accentColor
+    this.activeColor,
+    this.inactiveColor,
+    this.onChanged
   }) : super(key: key) {
-    assert(uncheckedColor != null);
-    assert(accentColor != null);
+    assert(value != null);
+    assert(activeColor != null);
+    assert(inactiveColor != null);
   }
 
   final bool value;
+  final Color activeColor;
+  final Color inactiveColor;
   final ValueChanged<bool> onChanged;
-  final Color uncheckedColor;
-  final Color accentColor;
 
   _RenderCheckbox createRenderObject() => new _RenderCheckbox(
     value: value,
-    accentColor: accentColor,
-    uncheckedColor: uncheckedColor,
+    activeColor: activeColor,
+    inactiveColor: inactiveColor,
     onChanged: onChanged
   );
 
-  void updateRenderObject(_RenderCheckbox renderObject, _CheckboxWrapper oldWidget) {
+  void updateRenderObject(_RenderCheckbox renderObject, _CheckboxRenderObjectWidget oldWidget) {
     renderObject.value = value;
+    renderObject.activeColor = activeColor;
+    renderObject.inactiveColor = inactiveColor;
     renderObject.onChanged = onChanged;
-    renderObject.uncheckedColor = uncheckedColor;
-    renderObject.accentColor = accentColor;
   }
 }
+
+const double _kMidpoint = 0.5;
+const double _kEdgeSize = 18.0;
+const double _kEdgeRadius = 1.0;
+const double _kStrokeWidth = 2.0;
+const double _kOffset = kRadialReactionRadius - _kEdgeSize / 2.0;
 
 class _RenderCheckbox extends RenderToggleable {
   _RenderCheckbox({
     bool value,
-    Color uncheckedColor,
-    Color accentColor,
+    Color activeColor,
+    Color inactiveColor,
     ValueChanged<bool> onChanged
-  }): _uncheckedColor = uncheckedColor,
-      _accentColor = accentColor,
-      super(
-        value: value,
-        onChanged: onChanged,
-        size: new Size(_kEdgeSize, _kEdgeSize)
-      ) {
-    assert(uncheckedColor != null);
-    assert(accentColor != null);
-  }
-
-  Color _uncheckedColor;
-  Color get uncheckedColor => _uncheckedColor;
-
-  void set uncheckedColor(Color value) {
-    assert(value != null);
-    if (value == _uncheckedColor)
-      return;
-    _uncheckedColor = value;
-    markNeedsPaint();
-  }
-
-  Color _accentColor;
-  void set accentColor(Color value) {
-    assert(value != null);
-    if (value == _accentColor)
-      return;
-    _accentColor = value;
-    markNeedsPaint();
-  }
+  }): super(
+    value: value,
+    activeColor: activeColor,
+    inactiveColor: inactiveColor,
+    onChanged: onChanged,
+    size: const Size(2 * kRadialReactionRadius, 2 * kRadialReactionRadius)
+  );
 
   void paint(PaintingContext context, Offset offset) {
-    final PaintingCanvas canvas = context.canvas;
+    final Canvas canvas = context.canvas;
+    final double offsetX = _kOffset + offset.dx;
+    final double offsetY = _kOffset + offset.dy;
+
+    paintRadialReaction(canvas, offset + const Offset(kRadialReactionRadius, kRadialReactionRadius));
+
     // Choose a color between grey and the theme color
     Paint paint = new Paint()
       ..strokeWidth = _kStrokeWidth
-      ..color = uncheckedColor;
+      ..color = inactiveColor;
 
     // The rrect contracts slightly during the transition animation from checked states.
     // Because we have a stroke size of 2, we should have a minimum 1.0 inset.
-    double inset = 2.0 - (position - _kMidpoint).abs() * 2.0;
+    double inset = 2.0 - (position.value - _kMidpoint).abs() * 2.0;
     double rectSize = _kEdgeSize - inset * _kStrokeWidth;
-    Rect rect = new Rect.fromLTWH(offset.dx + inset, offset.dy + inset, rectSize, rectSize);
+    Rect rect = new Rect.fromLTWH(offsetX + inset, offsetY + inset, rectSize, rectSize);
     // Create an inner rectangle to cover inside of rectangle. This is needed to avoid
     // painting artefacts caused by overlayed paintings.
     Rect innerRect = rect.deflate(1.0);
@@ -159,28 +126,30 @@ class _RenderCheckbox extends RenderToggleable {
     canvas.drawRRect(rrect, paint);
 
     // Radial gradient that changes size
-    if (position > 0) {
+    if (!position.isDismissed) {
       paint
         ..style = ui.PaintingStyle.fill
         ..shader = new ui.Gradient.radial(
           new Point(_kEdgeSize / 2.0, _kEdgeSize / 2.0),
-          _kEdgeSize * (_kMidpoint - position) * 8.0, <Color>[
+          _kEdgeSize * (_kMidpoint - position.value) * 8.0, <Color>[
         const Color(0x00000000),
-        uncheckedColor
+        inactiveColor
       ]);
       canvas.drawRect(innerRect, paint);
     }
 
-    if (position > _kMidpoint) {
-      double t = (position - _kMidpoint) / (1.0 - _kMidpoint);
+    if (position.value > _kMidpoint) {
+      double t = (position.value - _kMidpoint) / (1.0 - _kMidpoint);
 
-      // First draw a rounded rect outline then fill inner rectangle with accent color.
-      paint
-        ..color = new Color.fromARGB((t * 255).floor(), _accentColor.red, _accentColor.green, _accentColor.blue)
-        ..style = ui.PaintingStyle.stroke;
-      canvas.drawRRect(rrect, paint);
-      paint.style = ui.PaintingStyle.fill;
-      canvas.drawRect(innerRect, paint);
+      if (onChanged != null) {
+        // First draw a rounded rect outline then fill inner rectangle with the active color
+        paint
+          ..color = activeColor.withAlpha((t * 255).floor())
+          ..style = ui.PaintingStyle.stroke;
+        canvas.drawRRect(rrect, paint);
+        paint.style = ui.PaintingStyle.fill;
+        canvas.drawRect(innerRect, paint);
+      }
 
       // White inner check
       paint
@@ -194,9 +163,9 @@ class _RenderCheckbox extends RenderToggleable {
           new Point(p1.x * (1.0 - t) + p2.x * t, p1.y * (1.0 - t) + p2.y * t);
       Point drawStart = lerp(start, mid, 1.0 - t);
       Point drawEnd = lerp(mid, end, t);
-      path.moveTo(offset.dx + drawStart.x, offset.dy + drawStart.y);
-      path.lineTo(offset.dx + mid.x, offset.dy + mid.y);
-      path.lineTo(offset.dx + drawEnd.x, offset.dy + drawEnd.y);
+      path.moveTo(offsetX + drawStart.x, offsetY + drawStart.y);
+      path.lineTo(offsetX + mid.x, offsetY + mid.y);
+      path.lineTo(offsetX + drawEnd.x, offsetY + drawEnd.y);
       canvas.drawPath(path, paint);
     }
   }

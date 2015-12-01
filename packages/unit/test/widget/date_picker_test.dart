@@ -2,26 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:test/test.dart';
-
-import 'widget_tester.dart';
 
 void main() {
   test('Can select a day', () {
     testWidgets((WidgetTester tester) {
       DateTime currentValue;
 
-      Widget widget = new Block(<Widget>[
-        new DatePicker(
-          selectedDate: new DateTime.utc(2015, 6, 9, 7, 12),
-          firstDate: new DateTime.utc(2013),
-          lastDate: new DateTime.utc(2018),
-          onChanged: (DateTime dateTime) {
-            currentValue = dateTime;
-          }
-        )
-      ]);
+      Widget widget = new Material(
+        child: new Block(<Widget>[
+          new DatePicker(
+            selectedDate: new DateTime.utc(2015, 6, 9, 7, 12),
+            firstDate: new DateTime.utc(2013),
+            lastDate: new DateTime.utc(2018),
+            onChanged: (DateTime dateTime) {
+              currentValue = dateTime;
+            }
+          )
+        ])
+      );
 
       tester.pumpWidget(widget);
 

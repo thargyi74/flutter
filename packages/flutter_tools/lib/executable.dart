@@ -9,11 +9,12 @@ import 'package:args/command_runner.dart';
 import 'package:logging/logging.dart';
 import 'package:stack_trace/stack_trace.dart';
 
+import 'src/base/process.dart';
 import 'src/commands/analyze.dart';
+import 'src/commands/apk.dart';
 import 'src/commands/build.dart';
 import 'src/commands/cache.dart';
 import 'src/commands/daemon.dart';
-import 'src/commands/flutter_command_runner.dart';
 import 'src/commands/init.dart';
 import 'src/commands/install.dart';
 import 'src/commands/list.dart';
@@ -25,20 +26,27 @@ import 'src/commands/stop.dart';
 import 'src/commands/test.dart';
 import 'src/commands/trace.dart';
 import 'src/commands/upgrade.dart';
-import 'src/process.dart';
+import 'src/runner/flutter_command_runner.dart';
 
 /// Main entry point for commands.
 ///
 /// This function is intended to be used from the [flutter] command line tool.
 Future main(List<String> args) async {
+  DateTime startTime = new DateTime.now();
+
   // This level can be adjusted by users through the `--verbose` option.
   Logger.root.level = Level.WARNING;
   Logger.root.onRecord.listen((LogRecord record) {
+    String prefix = '';
+    if (Logger.root.level <= Level.FINE) {
+      Duration elapsed = record.time.difference(startTime);
+      prefix = '[${elapsed.inMilliseconds.toString().padLeft(4)} ms] ';
+    }
     String level = record.level.name.toLowerCase();
     if (record.level >= Level.WARNING) {
-      stderr.writeln('$level: ${record.message}');
+      stderr.writeln('$prefix$level: ${record.message}');
     } else {
-      print('$level: ${record.message}');
+      print('$prefix$level: ${record.message}');
     }
     if (record.error != null)
       stderr.writeln(record.error);
@@ -48,6 +56,7 @@ Future main(List<String> args) async {
 
   FlutterCommandRunner runner = new FlutterCommandRunner()
     ..addCommand(new AnalyzeCommand())
+    ..addCommand(new ApkCommand())
     ..addCommand(new BuildCommand())
     ..addCommand(new CacheCommand())
     ..addCommand(new DaemonCommand())

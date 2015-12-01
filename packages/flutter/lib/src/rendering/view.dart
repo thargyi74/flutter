@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:developer';
 import 'dart:ui' as ui;
 
 import 'package:flutter/animation.dart';
+import 'package:flutter/painting.dart';
 import 'package:vector_math/vector_math_64.dart';
 
 import 'box.dart';
+import 'debug.dart';
 import 'layer.dart';
 import 'object.dart';
 
@@ -109,24 +112,31 @@ class RenderView extends RenderObject with RenderObjectWithChildMixin<RenderBox>
 
   void paint(PaintingContext context, Offset offset) {
     if (child != null)
-      context.paintChild(child, offset.toPoint());
+      context.paintChild(child, offset);
   }
 
   /// Uploads the composited layer tree to the engine
   ///
   /// Actually causes the output of the rendering pipeline to appear on screen.
   void compositeFrame() {
-    ui.tracing.begin('RenderView.compositeFrame');
+    Timeline.startSync('Composite');
     try {
-      (layer as TransformLayer).transform = _logicalToDeviceTransform;
+      final TransformLayer transformLayer = layer;
+      transformLayer.transform = _logicalToDeviceTransform;
       Rect bounds = Point.origin & (size * ui.window.devicePixelRatio);
       ui.SceneBuilder builder = new ui.SceneBuilder(bounds);
-      layer.addToScene(builder, Offset.zero);
+      transformLayer.addToScene(builder, Offset.zero);
+      assert(layer == transformLayer);
       ui.Scene scene = builder.build();
       ui.window.render(scene);
       scene.dispose();
+      assert(() {
+        if (debugEnableRepaintRainbox)
+          debugCurrentRepaintColor = debugCurrentRepaintColor.withHue(debugCurrentRepaintColor.hue + debugRepaintRainboxHueIncrement);
+        return true;
+      });
     } finally {
-      ui.tracing.end('RenderView.compositeFrame');
+      Timeline.finishSync();
     }
   }
 

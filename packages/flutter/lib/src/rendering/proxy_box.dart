@@ -10,6 +10,7 @@ import 'package:flutter/gestures.dart';
 import 'package:vector_math/vector_math_64.dart';
 
 import 'box.dart';
+import 'debug.dart';
 import 'object.dart';
 
 export 'package:flutter/src/painting/box_painter.dart';
@@ -77,7 +78,7 @@ class RenderProxyBox extends RenderBox with RenderObjectWithChildMixin<RenderBox
 
   void paint(PaintingContext context, Offset offset) {
     if (child != null)
-      context.paintChild(child, offset.toPoint());
+      context.paintChild(child, offset);
   }
 }
 
@@ -161,8 +162,8 @@ class RenderFractionallySizedBox extends RenderProxyBox {
     double widthFactor,
     double heightFactor
   }) : _widthFactor = widthFactor, _heightFactor = heightFactor, super(child) {
-    assert(_widthFactor == null || _widthFactor > 0.0);
-    assert(_heightFactor == null || _heightFactor > 0.0);
+    assert(_widthFactor == null || _widthFactor >= 0.0);
+    assert(_heightFactor == null || _heightFactor >= 0.0);
   }
 
   /// The multiple to apply to the incoming maximum width constraint to use as
@@ -171,7 +172,7 @@ class RenderFractionallySizedBox extends RenderProxyBox {
   double get widthFactor => _widthFactor;
   double _widthFactor;
   void set widthFactor (double value) {
-    assert(value == null || value > 0.0);
+    assert(value == null || value >= 0.0);
     if (_widthFactor == value)
       return;
     _widthFactor = value;
@@ -184,7 +185,7 @@ class RenderFractionallySizedBox extends RenderProxyBox {
   double get heightFactor => _heightFactor;
   double _heightFactor;
   void set heightFactor (double value) {
-    assert(value == null || value > 0.0);
+    assert(value == null || value >= 0.0);
     if (_heightFactor == value)
       return;
     _heightFactor = value;
@@ -192,11 +193,25 @@ class RenderFractionallySizedBox extends RenderProxyBox {
   }
 
   BoxConstraints _getInnerConstraints(BoxConstraints constraints) {
+    double minWidth = constraints.minWidth;
+    double maxWidth = constraints.maxWidth;
+    if (_widthFactor != null) {
+      double width = maxWidth * _widthFactor;
+      minWidth = width;
+      maxWidth = width;
+    }
+    double minHeight = constraints.minHeight;
+    double maxHeight = constraints.maxHeight;
+    if (_heightFactor != null) {
+      double height = maxHeight * _heightFactor;
+      minHeight = height;
+      maxHeight = height;
+    }
     return new BoxConstraints(
-      minWidth: _widthFactor == null ? constraints.minWidth : constraints.maxWidth * _widthFactor,
-      maxWidth: _widthFactor == null ? constraints.maxWidth : constraints.maxWidth * _widthFactor,
-      minHeight: _heightFactor == null ? constraints.minHeight : constraints.maxHeight * _heightFactor,
-      maxHeight: _heightFactor == null ? constraints.maxHeight : constraints.maxHeight * _heightFactor
+      minWidth: minWidth,
+      maxWidth: maxWidth,
+      minHeight: minHeight,
+      maxHeight: maxHeight
     );
   }
 
@@ -501,10 +516,12 @@ class RenderOpacity extends RenderProxyBox {
       int a = _alpha;
       if (a == 0)
         return;
-      if (a == 255)
-        context.paintChild(child, offset.toPoint());
-      else
-        context.paintChildWithOpacity(child, offset.toPoint(), null, a);
+      if (a == 255) {
+        context.paintChild(child, offset);
+        return;
+      }
+      // TODO(abarth): We should pass bounds here.
+      context.pushOpacity(needsCompositing, offset, null, a, super.paint);
     }
   }
 
@@ -540,7 +557,7 @@ class RenderShaderMask extends RenderProxyBox {
 
   void paint(PaintingContext context, Offset offset) {
     if (child != null)
-      context.paintChildWithShaderMask(child, offset.toPoint(), offset & size, _shaderCallback, _transferMode);
+      context.pushShaderMask(needsCompositing, offset, Point.origin & size, _shaderCallback, _transferMode, super.paint);
   }
 }
 
@@ -552,7 +569,7 @@ class RenderClipRect extends RenderProxyBox {
 
   void paint(PaintingContext context, Offset offset) {
     if (child != null)
-      context.paintChildWithClipRect(child, offset.toPoint(), offset & size);
+      context.pushClipRect(needsCompositing, offset, Point.origin & size, super.paint);
   }
 }
 
@@ -598,9 +615,9 @@ class RenderClipRRect extends RenderProxyBox {
 
   void paint(PaintingContext context, Offset offset) {
     if (child != null) {
-      Rect rect = offset & size;
+      Rect rect = Point.origin & size;
       ui.RRect rrect = new ui.RRect.fromRectXY(rect, xRadius, yRadius);
-      context.paintChildWithClipRRect(child, offset.toPoint(), rect, rrect);
+      context.pushClipRRect(needsCompositing, offset, rect, rrect, super.paint);
     }
   }
 }
@@ -615,7 +632,7 @@ class RenderClipOval extends RenderProxyBox {
   Rect _cachedRect;
   Path _cachedPath;
 
-  Path _getPath(Rect rect) {
+  Path _getClipPath(Rect rect) {
     if (rect != _cachedRect) {
       _cachedRect = rect;
       _cachedPath = new Path()..addOval(_cachedRect);
@@ -634,8 +651,8 @@ class RenderClipOval extends RenderProxyBox {
 
   void paint(PaintingContext context, Offset offset) {
     if (child != null) {
-      Rect rect = offset & size;
-      context.paintChildWithClipPath(child, offset.toPoint(), rect, _getPath(rect));
+      Rect bounds = Point.origin & size;
+      context.pushClipPath(needsCompositing, offset, bounds, _getClipPath(bounds), super.paint);
     }
   }
 }
@@ -862,8 +879,14 @@ class RenderTransform extends RenderProxyBox {
   }
 
   void paint(PaintingContext context, Offset offset) {
-    if (child != null)
-      context.paintChildWithTransform(child, offset.toPoint(), _effectiveTransform);
+    if (child != null) {
+      Matrix4 transform = _effectiveTransform;
+      Offset childOffset = MatrixUtils.getAsTranslation(transform);
+      if (childOffset == null)
+        context.pushTransform(needsCompositing, offset, transform, super.paint);
+      else
+        super.paint(context, offset + childOffset);
+    }
   }
 
   void applyPaintTransform(Matrix4 transform) {
@@ -873,10 +896,8 @@ class RenderTransform extends RenderProxyBox {
 
   void debugDescribeSettings(List<String> settings) {
     super.debugDescribeSettings(settings);
-    List<String> matrix = _transform.toString().split('\n').map((String s) => '  $s').toList();
-    matrix.removeLast();
     settings.add('transform matrix:');
-    settings.addAll(matrix);
+    settings.addAll(debugDescribeTransform(_transform));
     settings.add('origin: $origin');
     settings.add('alignment: $alignment');
   }
@@ -912,9 +933,13 @@ class RenderSizeObserver extends RenderProxyBox {
   }
 }
 
-/// Called when its time to paint into the given canvas
-typedef void CustomPaintCallback(PaintingCanvas canvas, Size size);
-typedef bool CustomHitTestCallback(Point position);
+abstract class CustomPainter {
+  const CustomPainter();
+
+  void paint(PaintingCanvas canvas, Size size);
+  bool shouldRepaint(CustomPainter oldDelegate);
+  bool hitTest(Point position) => true;
+}
 
 /// Delegates its painting to [onPaint]
 ///
@@ -931,51 +956,47 @@ typedef bool CustomHitTestCallback(Point position);
 class RenderCustomPaint extends RenderProxyBox {
 
   RenderCustomPaint({
-    CustomPaintCallback onPaint,
-    this.onHitTest,
+    CustomPainter painter,
     RenderBox child
-  }) : super(child) {
-    assert(onPaint != null);
-    _onPaint = onPaint;
+  }) : _painter = painter, super(child) {
+    assert(painter != null);
   }
 
-  /// The callback to which this render object delegates its painting
-  ///
-  /// The callback must be non-null whenever the render object is attached to
-  /// the render tree.
-  CustomPaintCallback get onPaint => _onPaint;
-  CustomPaintCallback _onPaint;
-  void set onPaint (CustomPaintCallback newCallback) {
-    assert(newCallback != null || !attached);
-    if (_onPaint == newCallback)
+  CustomPainter get painter => _painter;
+  CustomPainter _painter;
+  void set painter (CustomPainter newPainter) {
+    assert(newPainter != null || !attached);
+    if (_painter == newPainter)
       return;
-    _onPaint = newCallback;
-    markNeedsPaint();
+    CustomPainter oldPainter = _painter;
+    _painter = newPainter;
+    if (newPainter == null)
+      return;
+    if (oldPainter == null
+        || newPainter.runtimeType != oldPainter.runtimeType
+        || newPainter.shouldRepaint(oldPainter))
+      markNeedsPaint();
   }
-
-  CustomHitTestCallback onHitTest;
 
   void attach() {
-    assert(_onPaint != null);
+    assert(_painter != null);
     super.attach();
   }
 
   bool hitTestSelf(Point position) {
-    return onHitTest == null || onHitTest(position);
+    return _painter.hitTest(position);
   }
 
   void paint(PaintingContext context, Offset offset) {
-    assert(_onPaint != null);
+    assert(_painter != null);
     context.canvas.translate(offset.dx, offset.dy);
-    _onPaint(context.canvas, size);
-    // TODO(abarth): We should translate back before calling super because in
-    // the future, super.paint might switch our compositing layer.
-    super.paint(context, Offset.zero);
+    _painter.paint(context.canvas, size);
     context.canvas.translate(-offset.dx, -offset.dy);
+    super.paint(context, offset);
   }
 }
 
-typedef void PointerEventListener(PointerInputEvent e);
+typedef void PointerEventListener(PointerInputEvent event);
 
 enum HitTestBehavior {
   deferToChild,
@@ -1050,6 +1071,19 @@ class RenderPointerListener extends RenderProxyBox {
         break;
     }
   }
+}
+
+/// Force this subtree to have a layer
+///
+/// This render object creates a separate display list for its child, which
+/// can improve performance if the subtree repaints at different times than
+/// the surrounding parts of the tree. Specifically, when the child does not
+/// repaint but its parent does, we can re-use the display list we recorded
+/// previously. Similarly, when the child repaints but the surround tree does
+/// not, we can re-record its display list without re-recording the display list
+/// for the surround tree.
+class RenderRepaintBoundary extends RenderProxyBox {
+  bool get hasLayer => true;
 }
 
 /// Is invisible during hit testing.

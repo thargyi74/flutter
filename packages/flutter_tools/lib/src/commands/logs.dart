@@ -4,12 +4,8 @@
 
 import 'dart:async';
 
-import 'package:logging/logging.dart';
-
 import '../device.dart';
-import 'flutter_command.dart';
-
-final Logger _logging = new Logger('flutter_tools.logs');
+import '../runner/flutter_command.dart';
 
 class LogsCommand extends FlutterCommand {
   final String name = 'logs';
@@ -21,6 +17,8 @@ class LogsCommand extends FlutterCommand {
         abbr: 'c',
         help: 'Clear log history before reading from logs (Android only).');
   }
+
+  bool get requiresProjectRoot => false;
 
   @override
   Future<int> runInProject() async {

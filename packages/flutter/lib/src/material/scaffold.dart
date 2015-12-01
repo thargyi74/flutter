@@ -2,14 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:async';
+import 'dart:collection';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/animation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
-import 'constants.dart';
+import 'bottom_sheet.dart';
 import 'material.dart';
+import 'snack_bar.dart';
 import 'tool_bar.dart';
 
 const double _kFloatingActionButtonMargin = 16.0; // TODO(hmuller): should be device dependent
@@ -54,7 +58,7 @@ class _ScaffoldLayout extends MultiChildLayoutDelegate {
 
     if (isChild(_Child.bottomSheet)) {
       bottomSheetSize = layoutChild(_Child.bottomSheet, fullWidthConstraints);
-      positionChild(_Child.bottomSheet, new Point(0.0, size.height - bottomSheetSize.height));
+      positionChild(_Child.bottomSheet, new Point((size.width - bottomSheetSize.width) / 2.0, size.height - bottomSheetSize.height));
     }
 
     if (isChild(_Child.snackBar)) {
@@ -77,46 +81,275 @@ class _ScaffoldLayout extends MultiChildLayoutDelegate {
 
 final _ScaffoldLayout _scaffoldLayout = new _ScaffoldLayout();
 
-void _addIfNonNull(List<LayoutId> children, Widget child, Object childId) {
-  if (child != null)
-    children.add(new LayoutId(child: child, id: childId));
-}
-
-class Scaffold extends StatelessComponent {
+class Scaffold extends StatefulComponent {
   Scaffold({
     Key key,
-    this.body,
     this.toolBar,
-    this.snackBar,
-    this.floatingActionButton,
-    this.bottomSheet
+    this.body,
+    this.floatingActionButton
   }) : super(key: key);
 
-  final Widget body;
   final ToolBar toolBar;
-  final Widget snackBar;
+  final Widget body;
   final Widget floatingActionButton;
-  final Widget bottomSheet;
+
+  static ScaffoldState of(BuildContext context) => context.ancestorStateOfType(ScaffoldState);
+
+  ScaffoldState createState() => new ScaffoldState();
+}
+
+class ScaffoldState extends State<Scaffold> {
+
+  // SNACKBAR API
+
+  Queue<ScaffoldFeatureController<SnackBar>> _snackBars = new Queue<ScaffoldFeatureController<SnackBar>>();
+  Performance _snackBarPerformance;
+  Timer _snackBarTimer;
+
+  ScaffoldFeatureController showSnackBar(SnackBar snackbar) {
+    _snackBarPerformance ??= SnackBar.createPerformance()
+      ..addStatusListener(_handleSnackBarStatusChange);
+    if (_snackBars.isEmpty) {
+      assert(_snackBarPerformance.isDismissed);
+      _snackBarPerformance.forward();
+    }
+    ScaffoldFeatureController<SnackBar> controller;
+    controller = new ScaffoldFeatureController<SnackBar>._(
+      // We provide a fallback key so that if back-to-back snackbars happen to
+      // match in structure, material ink splashes and highlights don't survive
+      // from one to the next.
+      snackbar.withPerformance(_snackBarPerformance, fallbackKey: new UniqueKey()),
+      new Completer(),
+      () {
+        assert(_snackBars.first == controller);
+        _hideSnackBar();
+      },
+      null // SnackBar doesn't use a builder function so setState() wouldn't rebuild it
+    );
+    setState(() {
+      _snackBars.addLast(controller);
+    });
+    return controller;
+  }
+
+  void _handleSnackBarStatusChange(PerformanceStatus status) {
+    switch (status) {
+      case PerformanceStatus.dismissed:
+        assert(_snackBars.isNotEmpty);
+        setState(() {
+          _snackBars.removeFirst();
+        });
+        if (_snackBars.isNotEmpty)
+          _snackBarPerformance.forward();
+        break;
+      case PerformanceStatus.completed:
+        setState(() {
+          assert(_snackBarTimer == null);
+          // build will create a new timer if necessary to dismiss the snack bar
+        });
+        break;
+      case PerformanceStatus.forward:
+      case PerformanceStatus.reverse:
+        break;
+    }
+  }
+
+  void _hideSnackBar() {
+    assert(_snackBarPerformance.status == PerformanceStatus.forward ||
+           _snackBarPerformance.status == PerformanceStatus.completed);
+    _snackBars.first._completer.complete();
+    _snackBarPerformance.reverse();
+    _snackBarTimer = null;
+  }
+
+
+  // PERSISTENT BOTTOM SHEET API
+
+  List<Widget> _dismissedBottomSheets;
+  ScaffoldFeatureController _currentBottomSheet;
+
+  ScaffoldFeatureController showBottomSheet(WidgetBuilder builder) {
+    if (_currentBottomSheet != null) {
+      _currentBottomSheet.close();
+      assert(_currentBottomSheet == null);
+    }
+    Completer completer = new Completer();
+    GlobalKey<_PersistentBottomSheetState> bottomSheetKey = new GlobalKey<_PersistentBottomSheetState>();
+    Performance performance = BottomSheet.createPerformance()
+      ..forward();
+    _PersistentBottomSheet bottomSheet;
+    LocalHistoryEntry entry = new LocalHistoryEntry(
+      onRemove: () {
+        assert(_currentBottomSheet._widget == bottomSheet);
+        assert(bottomSheetKey.currentState != null);
+        bottomSheetKey.currentState.close();
+        _dismissedBottomSheets ??= <Widget>[];
+        _dismissedBottomSheets.add(bottomSheet);
+        _currentBottomSheet = null;
+        completer.complete();
+      }
+    );
+    bottomSheet = new _PersistentBottomSheet(
+      key: bottomSheetKey,
+      performance: performance,
+      onClosing: () {
+        assert(_currentBottomSheet._widget == bottomSheet);
+        entry.remove();
+      },
+      onDismissed: () {
+        assert(_dismissedBottomSheets != null);
+        setState(() {
+          _dismissedBottomSheets.remove(bottomSheet);
+        });
+      },
+      builder: builder
+    );
+    ModalRoute.of(context).addLocalHistoryEntry(entry);
+    setState(() {
+      _currentBottomSheet = new ScaffoldFeatureController._(
+        bottomSheet,
+        completer,
+        () => entry.remove(),
+        setState
+      );
+    });
+    return _currentBottomSheet;
+  }
+
+
+  // INTERNALS
+
+  void dispose() {
+    _snackBarPerformance?.stop();
+    _snackBarPerformance = null;
+    _snackBarTimer?.cancel();
+    _snackBarTimer = null;
+    super.dispose();
+  }
+
+  void _addIfNonNull(List<LayoutId> children, Widget child, Object childId) {
+    if (child != null)
+      children.add(new LayoutId(child: child, id: childId));
+  }
 
   Widget build(BuildContext context) {
-    final Widget paddedToolBar = toolBar?.withPadding(new EdgeDims.only(top: ui.window.padding.top));
-    final Widget materialBody = body != null ? new Material(child: body) : null;
-    Widget constrainedSnackBar;
-    if (snackBar != null) {
-      // TODO(jackson): On tablet/desktop, minWidth = 288, maxWidth = 568
-      constrainedSnackBar = new ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: kSnackBarHeight),
-        child: snackBar
-      );
+    final Widget paddedToolBar = config.toolBar?.withPadding(new EdgeDims.only(top: ui.window.padding.top));
+    final Widget materialBody = config.body != null ? new Material(child: config.body) : null;
+
+    if (_snackBars.length > 0) {
+      ModalRoute route = ModalRoute.of(context);
+      if (route == null || route.isCurrent) {
+        if (_snackBarPerformance.isCompleted && _snackBarTimer == null)
+          _snackBarTimer = new Timer(_snackBars.first._widget.duration, _hideSnackBar);
+      } else {
+        _snackBarTimer?.cancel();
+        _snackBarTimer = null;
+      }
     }
 
     final List<LayoutId>children = new List<LayoutId>();
     _addIfNonNull(children, materialBody, _Child.body);
     _addIfNonNull(children, paddedToolBar, _Child.toolBar);
-    _addIfNonNull(children, bottomSheet, _Child.bottomSheet);
-    _addIfNonNull(children, constrainedSnackBar, _Child.snackBar);
-    _addIfNonNull(children, floatingActionButton, _Child.floatingActionButton);
+
+    if (_currentBottomSheet != null ||
+        (_dismissedBottomSheets != null && _dismissedBottomSheets.isNotEmpty)) {
+      List<Widget> bottomSheets = <Widget>[];
+      if (_dismissedBottomSheets != null && _dismissedBottomSheets.isNotEmpty)
+        bottomSheets.addAll(_dismissedBottomSheets);
+      if (_currentBottomSheet != null)
+        bottomSheets.add(_currentBottomSheet._widget);
+      Widget stack = new Stack(
+        bottomSheets,
+        alignment: const FractionalOffset(0.5, 1.0) // bottom-aligned, centered
+      );
+      _addIfNonNull(children, stack, _Child.bottomSheet);
+    }
+
+    if (_snackBars.isNotEmpty)
+      _addIfNonNull(children, _snackBars.first._widget, _Child.snackBar);
+
+    _addIfNonNull(children, config.floatingActionButton, _Child.floatingActionButton);
 
     return new CustomMultiChildLayout(children, delegate: _scaffoldLayout);
   }
+
+}
+
+class ScaffoldFeatureController<T extends Widget> {
+  const ScaffoldFeatureController._(this._widget, this._completer, this.close, this.setState);
+  final T _widget;
+  final Completer _completer;
+  Future get closed => _completer.future;
+  final VoidCallback close; // call this to close the bottom sheet or snack bar
+  final StateSetter setState;
+}
+
+class _PersistentBottomSheet extends StatefulComponent {
+  _PersistentBottomSheet({
+    Key key,
+    this.performance,
+    this.onClosing,
+    this.onDismissed,
+    this.builder
+  }) : super(key: key);
+
+  final Performance performance;
+  final VoidCallback onClosing;
+  final VoidCallback onDismissed;
+  final WidgetBuilder builder;
+
+  _PersistentBottomSheetState createState() => new _PersistentBottomSheetState();
+}
+
+class _PersistentBottomSheetState extends State<_PersistentBottomSheet> {
+
+  // We take ownership of the performance given in the first configuration.
+  // We also share control of that performance with out BottomSheet widget.
+
+  void initState() {
+    super.initState();
+    assert(config.performance.status == PerformanceStatus.forward);
+    config.performance.addStatusListener(_handleStatusChange);
+  }
+
+  void didUpdateConfig(_PersistentBottomSheet oldConfig) {
+    super.didUpdateConfig(oldConfig);
+    assert(config.performance == oldConfig.performance);
+  }
+
+  void dispose() {
+    config.performance.stop();
+    super.dispose();
+  }
+
+  void close() {
+    config.performance.reverse();
+  }
+
+  void _handleStatusChange(PerformanceStatus status) {
+    if (status == PerformanceStatus.dismissed && config.onDismissed != null)
+      config.onDismissed();
+  }
+
+  double _childHeight;
+  void _updateChildHeight(Size newSize) {
+    setState(() {
+      _childHeight = newSize.height;
+    });
+  }
+
+  Widget build(BuildContext context) {
+    return new AlignTransition(
+      performance: config.performance,
+      alignment: new AnimatedValue<FractionalOffset>(const FractionalOffset(0.0, 0.0)),
+      heightFactor: new AnimatedValue<double>(0.0, end: 1.0),
+      child: new BottomSheet(
+        performance: config.performance,
+        onClosing: config.onClosing,
+        childHeight: _childHeight,
+        builder: (BuildContext context) => new SizeObserver(child: config.builder(context), onSizeChanged: _updateChildHeight)
+      )
+    );
+  }
+
 }

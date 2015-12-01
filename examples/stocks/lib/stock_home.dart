@@ -6,6 +6,8 @@ part of stocks;
 
 typedef void ModeUpdater(StockMode mode);
 
+enum StockHomeTab { market, portfolio }
+
 class StockHome extends StatefulComponent {
   StockHome(this.stocks, this.symbols, this.stockMode, this.modeUpdater);
 
@@ -19,14 +21,14 @@ class StockHome extends StatefulComponent {
 
 class StockHomeState extends State<StockHome> {
 
-  final GlobalKey<PlaceholderState> _snackBarPlaceholderKey = new GlobalKey<PlaceholderState>();
-  final GlobalKey<PlaceholderState> _bottomSheetPlaceholderKey = new GlobalKey<PlaceholderState>();
+  final GlobalKey scaffoldKey = new GlobalKey();
+  final TabBarSelection _tabBarSelection = new TabBarSelection();
   bool _isSearching = false;
   String _searchQuery;
 
   void _handleSearchBegin() {
-    Navigator.of(context).push(new StateRoute(
-      onPop: () {
+    ModalRoute.of(context).addLocalHistoryEntry(new LocalHistoryEntry(
+      onRemove: () {
         setState(() {
           _isSearching = false;
           _searchQuery = null;
@@ -39,7 +41,7 @@ class StockHomeState extends State<StockHome> {
   }
 
   void _handleSearchEnd() {
-    Navigator.of(context).pop();
+    Navigator.pop(context);
   }
 
   void _handleSearchQueryChanged(String query) {
@@ -90,13 +92,13 @@ class StockHomeState extends State<StockHome> {
                   new FlatButton(
                     child: new Text('USE IT'),
                     onPressed: () {
-                      Navigator.of(context).pop(false);
+                      Navigator.pop(context, false);
                     }
                   ),
                   new FlatButton(
                     child: new Text('OH WELL'),
                     onPressed: () {
-                      Navigator.of(context).pop(false);
+                      Navigator.pop(context, false);
                     }
                   ),
                 ]
@@ -107,7 +109,7 @@ class StockHomeState extends State<StockHome> {
         ),
         new DrawerItem(
           icon: 'device/dvr',
-          onPressed: () { debugDumpApp(); debugDumpRenderTree(); },
+          onPressed: () { debugDumpApp(); debugDumpRenderTree(); debugDumpLayerTree(); },
           child: new Text('Dump App to Console')
         ),
         new DrawerDivider(),
@@ -140,13 +142,12 @@ class StockHomeState extends State<StockHome> {
   }
 
   void _handleShowSettings() {
-    Navigator.of(context)..pop()
-                         ..pushNamed('/settings');
+    Navigator.popAndPushNamed(context, '/settings');
   }
 
   Widget buildToolBar() {
     return new ToolBar(
-      level: 0,
+      elevation: 0,
       left: new IconButton(
         icon: "navigation/menu",
         onPressed: _showDrawer
@@ -161,7 +162,13 @@ class StockHomeState extends State<StockHome> {
           icon: "navigation/more_vert",
           onPressed: _handleMenuShow
         )
-      ]
+      ],
+      tabBar: new TabBar(
+        selection: _tabBarSelection,
+        labels: <TabLabel>[
+          const TabLabel(text: 'MARKET'),
+          const TabLabel(text: 'PORTFOLIO')]
+      )
     );
   }
 
@@ -179,56 +186,38 @@ class StockHomeState extends State<StockHome> {
     return stocks.where((Stock stock) => stock.symbol.contains(regexp));
   }
 
+  void _buyStock(Stock stock, Key arrowKey) {
+    setState(() {
+      stock.percentChange = 100.0 * (1.0 / stock.lastSale);
+      stock.lastSale += 1.0;
+    });
+    scaffoldKey.currentState.showSnackBar(new SnackBar(
+      content: new Text("Purchased ${stock.symbol} for ${stock.lastSale}"),
+      actions: <SnackBarAction>[
+        new SnackBarAction(label: "BUY MORE", onPressed: () { _buyStock(stock, arrowKey); })
+      ]
+    ));
+  }
+
   Widget buildStockList(BuildContext context, Iterable<Stock> stocks) {
     return new StockList(
       stocks: stocks.toList(),
-      onAction: (Stock stock, Key arrowKey) {
-        setState(() {
-          stock.percentChange = 100.0 * (1.0 / stock.lastSale);
-          stock.lastSale += 1.0;
-        });
-        showModalBottomSheet(
-          context: context,
-          child: new StockSymbolBottomSheet(stock: stock)
-        );
-      },
+      onAction: _buyStock,
       onOpen: (Stock stock, Key arrowKey) {
         Set<Key> mostValuableKeys = new Set<Key>();
         mostValuableKeys.add(arrowKey);
-        Navigator.of(context).pushNamed('/stock/${stock.symbol}', mostValuableKeys: mostValuableKeys);
+        Navigator.pushNamed(context, '/stock/${stock.symbol}', mostValuableKeys: mostValuableKeys);
       },
       onShow: (Stock stock, Key arrowKey) {
-        showBottomSheet(
-          placeholderKey: _bottomSheetPlaceholderKey,
-          context: context,
-          child: new StockSymbolBottomSheet(stock: stock)
-        );
+        scaffoldKey.currentState.showBottomSheet((BuildContext context) => new StockSymbolBottomSheet(stock: stock));
       }
     );
   }
 
   static const List<String> portfolioSymbols = const <String>["AAPL","FIZZ", "FIVE", "FLAT", "ZINC", "ZNGA"];
 
-  Widget buildTabNavigator() {
-    return new TabNavigator(
-      views: <TabNavigatorView>[
-        new TabNavigatorView(
-          label: const TabLabel(text: 'MARKET'),
-          builder: (BuildContext context) => buildStockList(context, _filterBySearchQuery(_getStockList(config.symbols)).toList())
-        ),
-        new TabNavigatorView(
-          label: const TabLabel(text: 'PORTFOLIO'),
-          builder: (BuildContext context) => buildStockList(context, _filterBySearchQuery(_getStockList(portfolioSymbols)).toList())
-        )
-      ],
-      selectedIndex: selectedTabIndex,
-      onChanged: (int tabIndex) {
-        setState(() { selectedTabIndex = tabIndex; } );
-      }
-    );
-  }
-
   static GlobalKey searchFieldKey = new GlobalKey();
+  static GlobalKey companyNameKey = new GlobalKey();
 
   // TODO(abarth): Should we factor this into a SearchBar in the framework?
   Widget buildSearchBar() {
@@ -247,18 +236,18 @@ class StockHomeState extends State<StockHome> {
     );
   }
 
-  void _handleUndo() {
-    Navigator.of(context).pop();
-  }
-
-  void _handleStockPurchased() {
-    showSnackBar(
+  void _handleCreateCompany() {
+    showModalBottomSheet(
+      // TODO(ianh): Fill this out.
       context: context,
-      placeholderKey: _snackBarPlaceholderKey,
-      content: new Text("Stock purchased!"),
-      actions: <SnackBarAction>[
-        new SnackBarAction(label: "UNDO", onPressed: _handleUndo)
-      ]
+      builder: (BuildContext context) {
+        return new Column([
+          new Input(
+            key: companyNameKey,
+            placeholder: 'Company Name'
+          ),
+        ]);
+      }
     );
   }
 
@@ -266,17 +255,47 @@ class StockHomeState extends State<StockHome> {
     return new FloatingActionButton(
       child: new Icon(icon: 'content/add'),
       backgroundColor: Colors.redAccent[200],
-      onPressed: _handleStockPurchased
+      onPressed: _handleCreateCompany
     );
+  }
+
+  Widget buildStockTab(BuildContext context, StockHomeTab tab, List<String> stockSymbols) {
+    return new Container(
+      key: new ValueKey<StockHomeTab>(tab),
+      child: buildStockList(context, _filterBySearchQuery(_getStockList(stockSymbols)).toList())
+    );
+  }
+
+  double _viewWidth = 100.0;
+  void _handleSizeChanged(Size newSize) {
+    setState(() {
+      _viewWidth = newSize.width;
+    });
   }
 
   Widget build(BuildContext context) {
     return new Scaffold(
+      key: scaffoldKey,
       toolBar: _isSearching ? buildSearchBar() : buildToolBar(),
-      body: buildTabNavigator(),
-      snackBar: new Placeholder(key: _snackBarPlaceholderKey),
-      bottomSheet: new Placeholder(key: _bottomSheetPlaceholderKey),
-      floatingActionButton: buildFloatingActionButton()
+      floatingActionButton: buildFloatingActionButton(),
+      body: new SizeObserver(
+        onSizeChanged: _handleSizeChanged,
+        child: new TabBarView<StockHomeTab>(
+          selection: _tabBarSelection,
+          items: [StockHomeTab.market, StockHomeTab.portfolio],
+          itemExtent: _viewWidth,
+          itemBuilder: (BuildContext context, StockHomeTab tab, _) {
+            switch (tab) {
+              case StockHomeTab.market:
+                return buildStockTab(context, tab, config.symbols);
+              case StockHomeTab.portfolio:
+                return buildStockTab(context, tab, portfolioSymbols);
+              default:
+                assert(false);
+            }
+          }
+        )
+      )
     );
   }
 }

@@ -36,7 +36,7 @@ class _Drawer extends StatelessComponent {
       child: new ConstrainedBox(
         constraints: const BoxConstraints.expand(width: _kWidth),
         child: new Material(
-          level: route.level,
+          elevation: route.elevation,
           child: route.child
         )
       )
@@ -51,10 +51,10 @@ enum _DrawerState {
 }
 
 class _DrawerRoute extends OverlayRoute {
-  _DrawerRoute({ this.child, this.level });
+  _DrawerRoute({ this.child, this.elevation });
 
   final Widget child;
-  final int level;
+  final int elevation;
 
   List<WidgetBuilder> get builders => <WidgetBuilder>[ _build ];
 
@@ -62,29 +62,33 @@ class _DrawerRoute extends OverlayRoute {
   _DrawerState _state = _DrawerState.showing;
 
   Widget _build(BuildContext context) {
-    return new _DrawerController(
-      key: _drawerKey,
-      settleDuration: _kBaseSettleDuration,
-      onClosed: () {
-        _DrawerState previousState = _state;
-        _state = _DrawerState.closed;
-        switch (previousState) {
-          case _DrawerState.showing:
-            Navigator.of(context).pop();
-            break;
-          case _DrawerState.popped:
-            super.didPop(null);
-            break;
-          case _DrawerState.closed:
-            assert(false);
-            break;
-        }
-      },
-      child: new _Drawer(route: this)
+    return new RepaintBoundary(
+      child: new _DrawerController(
+        key: _drawerKey,
+        settleDuration: _kBaseSettleDuration,
+        onClosed: () {
+          _DrawerState previousState = _state;
+          _state = _DrawerState.closed;
+          switch (previousState) {
+            case _DrawerState.showing:
+              Navigator.pop(context);
+              break;
+            case _DrawerState.popped:
+              finished();
+              break;
+            case _DrawerState.closed:
+              assert(false);
+              break;
+          }
+        },
+        child: new _Drawer(route: this)
+      )
     );
   }
 
-  void didPop(dynamic result) {
+  bool didPop(dynamic result) {
+    // we don't call the superclass because we want to control the timing of the
+    // call to finished().
     switch (_state) {
       case _DrawerState.showing:
         _drawerKey.currentState?._close();
@@ -94,9 +98,10 @@ class _DrawerRoute extends OverlayRoute {
         assert(false);
         break;
       case _DrawerState.closed:
-        super.didPop(null);
+        finished();
         break;
     }
+    return true;
   }
 }
 
@@ -202,7 +207,9 @@ class _DrawerControllerState extends State<_DrawerController> {
               widthFactor: _performance.progress,
               child: new SizeObserver(
                 onSizeChanged: _handleSizeChanged,
-                child: config.child
+                child: new RepaintBoundary(
+                  child: config.child
+                )
               )
             )
           )
@@ -212,6 +219,6 @@ class _DrawerControllerState extends State<_DrawerController> {
   }
 }
 
-void showDrawer({ BuildContext context, Widget child, int level: 3 }) {
-  Navigator.of(context).push(new _DrawerRoute(child: child, level: level));
+void showDrawer({ BuildContext context, Widget child, int elevation: 16 }) {
+  Navigator.push(context, new _DrawerRoute(child: child, elevation: elevation));
 }

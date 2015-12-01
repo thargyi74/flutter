@@ -6,9 +6,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:logging/logging.dart';
-
-import 'flutter_command.dart';
+import '../base/logging.dart';
+import '../runner/flutter_command.dart';
 import 'start.dart';
 import 'stop.dart';
 
@@ -20,12 +19,8 @@ const String domain = 'domain';
 /// A domain @command annotation.
 const String command = 'command';
 
-final Logger _logging = new Logger('flutter_tools.daemon');
-
 // TODO: Create a `device` domain in order to list devices and fire events when
 // devices are added or removed.
-
-// TODO: Is this the best name? Server? Daemon?
 
 /// A server process command. This command will start up a long-lived server.
 /// It reads JSON-RPC based commands from stdin, executes them, and returns
@@ -98,7 +93,7 @@ class Daemon {
     var id = command['id'];
 
     if (id == null) {
-      _logging.severe('no id for command: $command');
+      logging.severe('no id for command: $command');
       return;
     }
 
@@ -115,7 +110,7 @@ class Daemon {
       _domains[prefix].handleEvent(name, id, command['params']);
     } catch (error, trace) {
       _send({'id': id, 'error': _toJsonable(error)});
-      _logging.warning('error handling ${command['event']}', error, trace);
+      logging.warning('error handling ${command['event']}', error, trace);
     }
   }
 
@@ -153,7 +148,7 @@ abstract class Domain {
       }
     }).catchError((error, trace) {
       _send({'id': id, 'error': _toJsonable(error)});
-      _logging.warning('error handling $name', error, trace);
+      logging.warning('error handling $name', error, trace);
     });
   }
 

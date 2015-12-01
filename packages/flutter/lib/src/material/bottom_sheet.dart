@@ -18,17 +18,31 @@ const double _kCloseProgressThreshold = 0.5;
 const Color _kTransparent = const Color(0x00000000);
 const Color _kBarrierColor = Colors.black54;
 
-class _BottomSheetDragController extends StatelessComponent {
-  _BottomSheetDragController({
+class BottomSheet extends StatelessComponent {
+  BottomSheet({
     Key key,
     this.performance,
-    this.child,
-    this.childHeight
-  }) : super(key: key);
+    this.onClosing,
+    this.childHeight,
+    this.builder
+  }) : super(key: key) {
+    assert(onClosing != null);
+  }
 
+  /// The performance that controls the bottom sheet's position. The BottomSheet
+  /// widget will manipulate the position of this performance, it is not just a
+  /// passive observer.
   final Performance performance;
-  final Widget child;
+  final VoidCallback onClosing;
   final double childHeight;
+  final WidgetBuilder builder;
+
+  static Performance createPerformance() {
+    return new Performance(
+      duration: _kBottomSheetDuration,
+      debugLabel: 'BottomSheet'
+    );
+  }
 
   bool get _dismissUnderway => performance.direction == AnimationDirection.reverse;
 
@@ -38,17 +52,17 @@ class _BottomSheetDragController extends StatelessComponent {
     performance.progress -= delta / (childHeight ?? delta);
   }
 
-  void _handleDragEnd(Offset velocity, BuildContext context) {
+  void _handleDragEnd(Offset velocity) {
     if (_dismissUnderway)
       return;
     if (velocity.dy > _kMinFlingVelocity) {
-      performance.fling(velocity: -velocity.dy / childHeight).then((_) {
-        Navigator.of(context).pop();
-      });
+      double flingVelocity = -velocity.dy / childHeight;
+      performance.fling(velocity: flingVelocity);
+      if (flingVelocity < 0.0)
+        onClosing();
     } else if (performance.progress < _kCloseProgressThreshold) {
-      performance.fling(velocity: -1.0).then((_) {
-        Navigator.of(context).pop();
-      });
+      performance.fling(velocity: -1.0);
+      onClosing();
     } else {
       performance.forward();
     }
@@ -57,47 +71,20 @@ class _BottomSheetDragController extends StatelessComponent {
   Widget build(BuildContext context) {
     return new GestureDetector(
       onVerticalDragUpdate: _handleDragUpdate,
-      onVerticalDragEnd: (Offset velocity) { _handleDragEnd(velocity, context); },
-      child: child
+      onVerticalDragEnd: _handleDragEnd,
+      child: new Material(
+        child: builder(context)
+      )
     );
   }
 }
 
-class _BottomSheetRoute extends OverlayRoute {
-  _BottomSheetRoute({ this.completer, this.child });
+// PERSISTENT BOTTOM SHEETS
 
-  final Completer completer;
-  final Widget child;
-  Performance performance;
+// See scaffold.dart
 
-  void didPush(OverlayState overlay, OverlayEntry insertionPoint) {
-    performance = new Performance(duration: _kBottomSheetDuration, debugLabel: debugLabel)
-      ..forward();
-    super.didPush(overlay, insertionPoint);
-  }
 
-  void didPop(dynamic result) {
-    void finish() {
-      super.didPop(result); // clear the overlay entries
-      completer.complete(result);
-    }
-    if (performance.isDismissed)
-      finish();
-    else
-      performance.reverse().then((_) { finish(); });
-  }
-
-  String get debugLabel => '$runtimeType';
-  String toString() => '$runtimeType(performance: $performance)';
-}
-
-class _ModalBottomSheet extends StatefulComponent {
-  _ModalBottomSheet({ Key key, this.route }) : super(key: key);
-
-  final _ModalBottomSheetRoute route;
-
-  _ModalBottomSheetState createState() => new _ModalBottomSheetState();
-}
+// MODAL BOTTOM SHEETS
 
 class _ModalBottomSheetLayout extends OneChildLayoutDelegate {
   // The distance from the bottom of the parent to the top of the BottomSheet child.
@@ -118,13 +105,21 @@ class _ModalBottomSheetLayout extends OneChildLayoutDelegate {
   }
 }
 
+class _ModalBottomSheet extends StatefulComponent {
+  _ModalBottomSheet({ Key key, this.route }) : super(key: key);
+
+  final _ModalBottomSheetRoute route;
+
+  _ModalBottomSheetState createState() => new _ModalBottomSheetState();
+}
+
 class _ModalBottomSheetState extends State<_ModalBottomSheet> {
 
   final _ModalBottomSheetLayout _layout = new _ModalBottomSheetLayout();
 
   Widget build(BuildContext context) {
     return new GestureDetector(
-      onTap: () { Navigator.of(context).pop(); },
+      onTap: () => Navigator.pop(context),
       child: new BuilderTransition(
         performance: config.route.performance,
         variables: <AnimatedValue<double>>[_layout.childTop],
@@ -133,10 +128,11 @@ class _ModalBottomSheetState extends State<_ModalBottomSheet> {
             child: new CustomOneChildLayout(
               delegate: _layout,
               token: _layout.childTop.value,
-              child: new _BottomSheetDragController(
+              child: new BottomSheet(
                 performance: config.route.performance,
-                child: new Material(child: config.route.child),
-                childHeight: _layout.childTop.end
+                onClosing: () => Navigator.pop(context),
+                childHeight: _layout.childTop.end,
+                builder: config.route.builder
               )
             )
           );
@@ -146,84 +142,34 @@ class _ModalBottomSheetState extends State<_ModalBottomSheet> {
   }
 }
 
-class _ModalBottomSheetRoute extends _BottomSheetRoute {
-  _ModalBottomSheetRoute({ Completer completer, Widget child })
-    : super(completer: completer, child: child);
+class _ModalBottomSheetRoute<T> extends PopupRoute<T> {
+  _ModalBottomSheetRoute({
+    Completer<T> completer,
+    this.builder
+  }) : super(completer: completer);
 
-  Widget _buildModalBarrier(BuildContext context) {
-    return new AnimatedModalBarrier(
-      color: new AnimatedColorValue(_kTransparent, end: _kBarrierColor, curve: Curves.ease),
-      performance: performance
-    );
+  final WidgetBuilder builder;
+
+  Duration get transitionDuration => _kBottomSheetDuration;
+  bool get barrierDismissable => true;
+  Color get barrierColor => Colors.black54;
+
+  Performance createPerformance() {
+    return BottomSheet.createPerformance();
   }
 
-  Widget _buildBottomSheet(BuildContext context) {
-    return new Focus(
-      key: new GlobalObjectKey(this),
-      child: new _ModalBottomSheet(route: this)
-    );
+  Widget buildPage(BuildContext context) {
+    return new _ModalBottomSheet(route: this);
   }
-
-  List<WidgetBuilder> get builders => <WidgetBuilder>[
-    _buildModalBarrier,
-    _buildBottomSheet,
-  ];
 }
 
-Future showModalBottomSheet({ BuildContext context, Widget child }) {
-  assert(child != null);
+Future showModalBottomSheet({ BuildContext context, WidgetBuilder builder }) {
+  assert(context != null);
+  assert(builder != null);
   final Completer completer = new Completer();
-  Navigator.of(context).pushEphemeral(new _ModalBottomSheetRoute(
+  Navigator.push(context, new _ModalBottomSheetRoute(
     completer: completer,
-    child: child
+    builder: builder
   ));
   return completer.future;
-}
-
-class _PersistentBottomSheet extends StatefulComponent {
-  _PersistentBottomSheet({ Key key, this.route }) : super(key: key);
-
-  final _BottomSheetRoute route;
-
-  _PersistentBottomSheetState createState() => new _PersistentBottomSheetState();
-}
-
-class _PersistentBottomSheetState extends State<_PersistentBottomSheet> {
-
-  double _childHeight;
-  void _updateChildHeight(Size newSize) {
-    setState(() {
-      _childHeight = newSize.height;
-    });
-  }
-
-  Widget build(BuildContext context) {
-    return new AlignTransition(
-      performance: config.route.performance,
-      alignment: new AnimatedValue<FractionalOffset>(const FractionalOffset(0.0, 0.0)),
-      heightFactor: new AnimatedValue<double>(0.0, end: 1.0),
-      child: new _BottomSheetDragController(
-        performance: config.route.performance,
-        childHeight: _childHeight,
-        child: new Material(
-          child: new SizeObserver(child: config.route.child, onSizeChanged: _updateChildHeight)
-        )
-      )
-    );
-  }
-}
-
-Future showBottomSheet({ BuildContext context, GlobalKey<PlaceholderState> placeholderKey, Widget child }) {
-  assert(child != null);
-  assert(placeholderKey != null);
-  final Completer completer = new Completer();
-  _BottomSheetRoute route = new _BottomSheetRoute(child: child, completer: completer);
-  placeholderKey.currentState.child = new _PersistentBottomSheet(route: route);
-  Navigator.of(context).pushEphemeral(route);
-  return completer.future.then((_) {
-    // If our overlay has been obscured by an opaque OverlayEntry then currentState
-    // will have been cleared already.
-    if (placeholderKey.currentState != null)
-      placeholderKey.currentState.child = null;
-  });
 }

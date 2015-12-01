@@ -1,0 +1,11 @@
+name: material_gallery
+material-design-icons:
+  - name: navigation/arrow_drop_down
+  - name: navigation/cancel
+  - name: navigation/menu
+  - name: action/event
+  - name: action/home
+  - name: action/android
+  - name: action/alarm
+  - name: action/face
+  - name: action/language

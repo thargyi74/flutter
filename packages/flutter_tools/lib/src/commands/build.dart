@@ -12,8 +12,10 @@ import 'package:flx/signing.dart';
 import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
 
+import '../base/file_system.dart';
+import '../base/logging.dart';
+import '../runner/flutter_command.dart';
 import '../toolchain.dart';
-import 'flutter_command.dart';
 
 const String _kSnapshotKey = 'snapshot_blob.bin';
 const List<String> _kDensities = const ['drawable-xxhdpi'];
@@ -30,7 +32,7 @@ class _Asset {
 Iterable<_Asset> _parseAssets(Map manifestDescriptor, String manifestPath) sync* {
   if (manifestDescriptor == null || !manifestDescriptor.containsKey('assets'))
     return;
-  String basePath = new File(manifestPath).parent.path;
+  String basePath = path.dirname(path.absolute(manifestPath));
   for (String asset in manifestDescriptor['assets'])
     yield new _Asset(base: basePath, key: asset);
 }
@@ -109,13 +111,13 @@ ArchiveFile _createSnapshotFile(String snapshotPath) {
 const String _kDefaultAssetBase = 'packages/material_design_icons/icons';
 const String _kDefaultMainPath = 'lib/main.dart';
 const String _kDefaultManifestPath = 'flutter.yaml';
-const String _kDefaultOutputPath = 'app.flx';
-const String _kDefaultSnapshotPath = 'snapshot_blob.bin';
+const String _kDefaultOutputPath = 'build/app.flx';
+const String _kDefaultSnapshotPath = 'build/snapshot_blob.bin';
 const String _kDefaultPrivateKeyPath = 'privatekey.der';
 
 class BuildCommand extends FlutterCommand {
   final String name = 'build';
-  final String description = 'Create a Flutter app.';
+  final String description = 'Packages your Flutter app into an FLX.';
 
   BuildCommand() {
     argParser.addFlag('precompiled', negatable: false);
@@ -178,6 +180,8 @@ class BuildCommand extends FlutterCommand {
     String privateKeyPath: _kDefaultPrivateKeyPath,
     bool precompiledSnapshot: false
   }) async {
+    logging.fine('Building $outputPath');
+
     Map manifestDescriptor = _loadManifest(manifestPath);
 
     Iterable<_Asset> assets = _parseAssets(manifestDescriptor, manifestPath);
@@ -186,6 +190,8 @@ class BuildCommand extends FlutterCommand {
     Archive archive = new Archive();
 
     if (!precompiledSnapshot) {
+      ensureDirectoryExists(snapshotPath);
+
       // In a precompiled snapshot, the instruction buffer contains script
       // content equivalents
       int result = await toolchain.compiler.compile(mainPath: mainPath, snapshotPath: snapshotPath);
@@ -195,8 +201,14 @@ class BuildCommand extends FlutterCommand {
       archive.addFile(_createSnapshotFile(snapshotPath));
     }
 
-    for (_Asset asset in assets)
-      archive.addFile(_createFile(asset.key, asset.base));
+    for (_Asset asset in assets) {
+      ArchiveFile file = _createFile(asset.key, asset.base);
+      if (file == null) {
+        stderr.writeln('Cannot find asset "${asset.key}" in directory "${path.absolute(asset.base)}".');
+        return 1;
+      }
+      archive.addFile(file);
+    }
 
     for (_MaterialAsset asset in materialAssets) {
       ArchiveFile file = _createFile(asset.key, assetBase);
@@ -208,6 +220,7 @@ class BuildCommand extends FlutterCommand {
 
     AsymmetricKeyPair keyPair = keyPairFromPrivateKeyFileSync(privateKeyPath);
     Uint8List zipBytes = new Uint8List.fromList(new ZipEncoder().encode(archive));
+    ensureDirectoryExists(outputPath);
     Bundle bundle = new Bundle.fromContent(
       path: outputPath,
       manifest: manifestDescriptor,

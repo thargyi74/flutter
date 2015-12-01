@@ -54,14 +54,13 @@ class FeedFragment extends StatefulComponent {
 }
 
 class FeedFragmentState extends State<FeedFragment> {
-  final GlobalKey<PlaceholderState> _snackBarPlaceholderKey = new GlobalKey<PlaceholderState>();
   FitnessMode _fitnessMode = FitnessMode.feed;
 
   void _handleFitnessModeChange(FitnessMode value) {
     setState(() {
       _fitnessMode = value;
     });
-    Navigator.of(context).pop();
+    Navigator.pop(context);
   }
 
   void _showDrawer() {
@@ -92,8 +91,7 @@ class FeedFragmentState extends State<FeedFragment> {
   }
 
   void _handleShowSettings() {
-    Navigator.of(context)..pop()
-                         ..pushNamed('/settings');
+    Navigator.popAndPushNamed(context, '/settings');
   }
 
   // TODO(jackson): We should be localizing
@@ -115,15 +113,14 @@ class FeedFragmentState extends State<FeedFragment> {
 
   void _handleItemDismissed(FitnessItem item) {
     config.onItemDeleted(item);
-    showSnackBar(
-      context: context,
-      placeholderKey: _snackBarPlaceholderKey,
+    Scaffold.of(context).showSnackBar(new SnackBar(
       content: new Text("Item deleted."),
-      actions: <SnackBarAction>[new SnackBarAction(label: "UNDO", onPressed: () {
-        config.onItemCreated(item);
-        Navigator.of(context).pop();
-      })]
-    );
+      actions: <SnackBarAction>[
+        new SnackBarAction(label: "UNDO", onPressed: () {
+          config.onItemCreated(item);
+        }),
+      ]
+    ));
   }
 
   Widget buildChart() {
@@ -192,7 +189,7 @@ class FeedFragmentState extends State<FeedFragment> {
   void _handleActionButtonPressed() {
     showDialog(context: context, child: new AddItemDialog()).then((routeName) {
       if (routeName != null)
-        Navigator.of(context).pushNamed(routeName);
+        Navigator.pushNamed(context, routeName);
     });
   }
 
@@ -212,7 +209,6 @@ class FeedFragmentState extends State<FeedFragment> {
     return new Scaffold(
       toolBar: buildToolBar(),
       body: buildBody(),
-      snackBar: new Placeholder(key: _snackBarPlaceholderKey),
       floatingActionButton: buildFloatingActionButton()
     );
   }
@@ -252,13 +248,13 @@ class AddItemDialogState extends State<AddItemDialog> {
         new FlatButton(
           child: new Text('CANCEL'),
           onPressed: () {
-            Navigator.of(context).pop();
+            Navigator.pop(context);
           }
         ),
         new FlatButton(
           child: new Text('ADD'),
           onPressed: () {
-            Navigator.of(context).pop(_addItemRoute);
+            Navigator.pop(context, _addItemRoute);
           }
         ),
       ]

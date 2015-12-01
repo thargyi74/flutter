@@ -75,7 +75,7 @@ abstract class GlobalKey<T extends State<StatefulComponent>> extends Key {
 
   /// Constructs a LabeledGlobalKey, which is a GlobalKey with a label used for debugging.
   /// The label is not used for comparing the identity of the key.
-  factory GlobalKey({ String label }) => new LabeledGlobalKey<T>(label); // the label is purely for debugging purposes and is otherwise ignored
+  factory GlobalKey({ String debugLabel }) => new LabeledGlobalKey<T>(debugLabel); // the label is purely for debugging purposes and is otherwise ignored
 
   static final Map<GlobalKey, Element> _registry = new Map<GlobalKey, Element>();
   static final Map<GlobalKey, int> _debugDuplicates = new Map<GlobalKey, int>();
@@ -175,9 +175,9 @@ abstract class GlobalKey<T extends State<StatefulComponent>> extends Key {
 /// The optional label can be used for documentary purposes. It does not affect
 /// the key's identity.
 class LabeledGlobalKey<T extends State<StatefulComponent>> extends GlobalKey<T> {
-  const LabeledGlobalKey(this._label) : super.constructor();
-  final String _label;
-  String toString() => '[GlobalKey ${_label != null ? _label : hashCode}]';
+  const LabeledGlobalKey(this._debugLabel) : super.constructor();
+  final String _debugLabel;
+  String toString() => '[GlobalKey ${_debugLabel != null ? _debugLabel : hashCode}]';
 }
 
 /// A kind of [GlobalKey] that takes its identity from the object used as its value.
@@ -332,6 +332,9 @@ enum _StateLifecycle {
   defunct,
 }
 
+/// The signature of setState() methods.
+typedef void StateSetter(VoidCallback fn);
+
 /// The logic and internal state for a StatefulComponent.
 abstract class State<T extends StatefulComponent> {
   /// The current configuration (an instance of the corresponding
@@ -377,14 +380,23 @@ abstract class State<T extends StatefulComponent> {
   /// If you just change the state directly without calling setState(), then the
   /// component will not be scheduled for rebuilding, meaning that its rendering
   /// will not be updated.
-  void setState(void fn()) {
+  void setState(VoidCallback fn) {
     assert(_debugLifecycleState != _StateLifecycle.defunct);
     fn();
     _element.markNeedsBuild();
   }
 
-  /// Called when this object is removed from the tree. Override this to clean
-  /// up any resources allocated by this object.
+  /// Called when this object is removed from the tree.
+  /// The object might momentarily be reattached to the tree elsewhere.
+  ///
+  /// Use this to clean up any links between this state and other
+  /// elements in the tree (e.g. if you have provided an ancestor with
+  /// a pointer to a descendant's renderObject).
+  void deactivate() { }
+
+  /// Called when this object is removed from the tree permanently.
+  /// Override this to clean up any resources allocated by this
+  /// object.
   ///
   /// If you override this, make sure to end your method with a call to
   /// super.dispose().
@@ -401,6 +413,11 @@ abstract class State<T extends StatefulComponent> {
   /// the tree at which this component is being built. For example, the context
   /// provides the set of inherited widgets for this location in the tree.
   Widget build(BuildContext context);
+
+  /// Called when an Inherited widget in the ancestor chain has changed. Usually
+  /// there is nothing to do here; whenever this is called, build() is also
+  /// called. 
+  void dependenciesChanged(Type affectedWidgetType) { }
 
   String toString() {
     final List<String> data = <String>[];
@@ -534,7 +551,10 @@ typedef void ElementVisitor(Element element);
 abstract class BuildContext {
   Widget get widget;
   RenderObject findRenderObject();
-  InheritedWidget inheritedWidgetOfType(Type targetType);
+  InheritedWidget inheritFromWidgetOfType(Type targetType);
+  Widget ancestorWidgetOfType(Type targetType);
+  State ancestorStateOfType(Type targetType);
+  RenderObject ancestorRenderObjectOfType(Type targetType);
   void visitAncestorElements(bool visitor(Element element));
   void visitChildElements(void visitor(Element element));
 }
@@ -772,7 +792,7 @@ abstract class Element<T extends Widget> implements BuildContext {
     assert(child._parent == this);
     child._parent = null;
     child.detachRenderObject();
-    _inactiveElements.add(child);
+    _inactiveElements.add(child); // this eventually calls child.deactivate()
   }
 
   void deactivate() {
@@ -806,18 +826,44 @@ abstract class Element<T extends Widget> implements BuildContext {
     assert(() { _debugLifecycleState = _ElementLifecycle.defunct; return true; });
   }
 
+  RenderObject findRenderObject() => renderObject;
+
   Set<Type> _dependencies;
-  InheritedWidget inheritedWidgetOfType(Type targetType) {
+  InheritedWidget inheritFromWidgetOfType(Type targetType) {
     if (_dependencies == null)
       _dependencies = new Set<Type>();
     _dependencies.add(targetType);
+    return ancestorWidgetOfType(targetType);
+  }
+
+  Widget ancestorWidgetOfType(Type targetType) {
     Element ancestor = _parent;
     while (ancestor != null && ancestor.widget.runtimeType != targetType)
       ancestor = ancestor._parent;
     return ancestor?.widget;
   }
 
-  RenderObject findRenderObject() => renderObject;
+  State ancestorStateOfType(Type targetType) {
+    Element ancestor = _parent;
+    while (ancestor != null) {
+      if (ancestor is StatefulComponentElement && ancestor.state.runtimeType == targetType)
+        break;
+      ancestor = ancestor._parent;
+    }
+    StatefulComponentElement statefulAncestor = ancestor;
+    return statefulAncestor?.state;
+  }
+
+  RenderObject ancestorRenderObjectOfType(Type targetType) {
+    Element ancestor = _parent;
+    while (ancestor != null) {
+      if (ancestor is RenderObjectElement && ancestor.renderObject.runtimeType == targetType)
+        break;
+      ancestor = ancestor._parent;
+    }
+    RenderObjectElement renderObjectAncestor = ancestor;
+    return renderObjectAncestor?.renderObject;
+  }
 
   void visitAncestorElements(bool visitor(Element element)) {
     Element ancestor = _parent;
@@ -825,7 +871,7 @@ abstract class Element<T extends Widget> implements BuildContext {
       ancestor = ancestor._parent;
   }
 
-  void dependenciesChanged() {
+  void dependenciesChanged(Type affectedWidgetType) {
     assert(false);
   }
 
@@ -1004,7 +1050,7 @@ abstract class BuildableElement<T extends Widget> extends Element<T> {
   /// Called by rebuild() after the appropriate checks have been made.
   void performRebuild();
 
-  void dependenciesChanged() {
+  void dependenciesChanged(Type affectedWidgetType) {
     markNeedsBuild();
   }
 
@@ -1149,6 +1195,11 @@ class StatefulComponentElement<T extends StatefulComponent, U extends State<T>> 
     rebuild();
   }
 
+  void deactivate() {
+    _state.deactivate();
+    super.deactivate();
+  }
+
   void unmount() {
     super.unmount();
     _state.dispose();
@@ -1161,6 +1212,11 @@ class StatefulComponentElement<T extends StatefulComponent, U extends State<T>> 
     assert(!dirty); // See BuildableElement.unmount for why this is important.
     _state._element = null;
     _state = null;
+  }
+
+  void dependenciesChanged(Type affectedWidgetType) {
+    super.dependenciesChanged(affectedWidgetType);
+    _state.dependenciesChanged(affectedWidgetType);
   }
 
   void debugFillDescription(List<String> description) {
@@ -1232,7 +1288,7 @@ class InheritedElement extends ProxyElement<InheritedWidget> {
     void notifyChildren(Element child) {
       if (child._dependencies != null &&
           child._dependencies.contains(ourRuntimeType)) {
-        child.dependenciesChanged();
+        child.dependenciesChanged(ourRuntimeType);
       }
       if (child.runtimeType != ourRuntimeType)
         child.visitChildren(notifyChildren);

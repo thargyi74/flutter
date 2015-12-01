@@ -5,17 +5,15 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
 
 import '../application_package.dart';
+import '../base/logging.dart';
 import '../device.dart';
+import '../runner/flutter_command.dart';
 import 'build.dart';
-import 'flutter_command.dart';
 import 'install.dart';
 import 'stop.dart';
-
-final Logger _logging = new Logger('flutter_tools.start');
 
 class StartCommand extends FlutterCommand {
   final String name = 'start';
@@ -33,12 +31,26 @@ class StartCommand extends FlutterCommand {
         defaultsTo: '',
         abbr: 't',
         help: 'Target app path or filename to start.');
+    argParser.addOption('route', help: 'Which route to load when starting the app.');
     argParser.addFlag('boot',
         help: 'Boot the iOS Simulator if it isn\'t already running.');
   }
 
+  /// Given the value of the --target option, return the path of the Dart file
+  /// where the app's main function should be.
+  static String findMainDartFile(String target) {
+    String targetPath = path.absolute(target);
+    if (FileSystemEntity.isDirectorySync(targetPath)) {
+      return path.join(targetPath, 'lib', 'main.dart');
+    } else {
+      return targetPath;
+    }
+  }
+
   @override
   Future<int> runInProject() async {
+    logging.fine('downloading toolchain');
+
     await Future.wait([
       downloadToolchain(),
       downloadApplicationPackagesAndConnectToDevices(),
@@ -46,9 +58,13 @@ class StartCommand extends FlutterCommand {
 
     bool poke = argResults['poke'];
     if (!poke) {
+      logging.fine('running stop command');
+
       StopCommand stopper = new StopCommand();
       stopper.inheritFromParent(this);
       stopper.stop();
+
+      logging.fine('running install command');
 
       // Only install if the user did not specify a poke
       InstallCommand installer = new InstallCommand();
@@ -62,11 +78,9 @@ class StartCommand extends FlutterCommand {
       ApplicationPackage package = applicationPackages.getPackageForPlatform(device.platform);
       if (package == null || !device.isConnected())
         continue;
+
       if (device is AndroidDevice) {
-        String target = path.absolute(argResults['target']);
-        String mainPath = target;
-        if (FileSystemEntity.isDirectorySync(target))
-          mainPath = path.join(target, 'lib', 'main.dart');
+        String mainPath = findMainDartFile(argResults['target']);
         if (!FileSystemEntity.isFileSync(mainPath)) {
           String message = 'Tried to run $mainPath, but that file does not exist.';
           if (!argResults.wasParsed('target'))
@@ -75,16 +89,25 @@ class StartCommand extends FlutterCommand {
           continue;
         }
 
+        logging.fine('running build command for $device');
+
         BuildCommand builder = new BuildCommand();
         builder.inheritFromParent(this);
         await builder.buildInTempDir(
           mainPath: mainPath,
           onBundleAvailable: (String localBundlePath) {
-            if (device.startBundle(package, localBundlePath, poke, argResults['checked']))
+            logging.fine('running start bundle for $device');
+
+            if (device.startBundle(package, localBundlePath,
+                                   poke: poke,
+                                   checked: argResults['checked'],
+                                   route: argResults['route']))
               startedSomething = true;
           }
         );
       } else {
+        logging.fine('running start command for $device');
+
         if (await device.startApp(package))
           startedSomething = true;
       }
@@ -92,11 +115,13 @@ class StartCommand extends FlutterCommand {
 
     if (!startedSomething) {
       if (!devices.all.any((device) => device.isConnected())) {
-        _logging.severe('Unable to run application - no connected devices.');
+        logging.severe('Unable to run application - no connected devices.');
       } else {
-        _logging.severe('Unable to run application.');
+        logging.severe('Unable to run application.');
       }
     }
+
+    logging.fine('finished start command');
 
     return startedSomething ? 0 : 2;
   }

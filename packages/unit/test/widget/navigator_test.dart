@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:test/test.dart';
-
-import 'widget_tester.dart';
 
 class FirstComponent extends StatelessComponent {
   Widget build(BuildContext context) {
     return new GestureDetector(
       onTap: () {
-        Navigator.of(context).pushNamed('/second');
+        Navigator.pushNamed(context, '/second');
       },
       child: new Container(
         decoration: new BoxDecoration(
@@ -30,7 +29,7 @@ class SecondComponent extends StatefulComponent {
 class SecondComponentState extends State<SecondComponent> {
   Widget build(BuildContext context) {
     return new GestureDetector(
-      onTap: Navigator.of(context).pop,
+      onTap: () => Navigator.pop(context),
       child: new Container(
         decoration: new BoxDecoration(
           backgroundColor: new Color(0xFFFF00FF)

@@ -3,16 +3,13 @@
 // found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/animation.dart';
-import 'package:flutter/painting.dart';
 import 'package:flutter/widgets.dart';
 
 import 'ink_well.dart';
+import 'material.dart';
 import 'popup_menu_item.dart';
-import 'shadows.dart';
-import 'theme.dart';
 
 const Duration _kMenuDuration = const Duration(milliseconds: 300);
 const double _kMenuCloseIntervalEnd = 2.0 / 3.0;
@@ -22,21 +19,15 @@ const double _kMenuMaxWidth = 5.0 * _kMenuWidthStep;
 const double _kMenuHorizontalPadding = 16.0;
 const double _kMenuVerticalPadding = 8.0;
 
-class _PopupMenu extends StatelessComponent {
+class _PopupMenu<T> extends StatelessComponent {
   _PopupMenu({
     Key key,
     this.route
   }) : super(key: key);
 
-  final _MenuRoute route;
+  final _PopupMenuRoute<T> route;
 
   Widget build(BuildContext context) {
-    final BoxPainter painter = new BoxPainter(new BoxDecoration(
-      backgroundColor: Theme.of(context).canvasColor,
-      borderRadius: 2.0,
-      boxShadow: shadows[route.level]
-    ));
-
     double unit = 1.0 / (route.items.length + 1.5); // 1.0 for the width and 0.5 for the last item's fade.
     List<Widget> children = <Widget>[];
 
@@ -47,7 +38,7 @@ class _PopupMenu extends StatelessComponent {
         performance: route.performance,
         opacity: new AnimatedValue<double>(0.0, end: 1.0, curve: new Interval(start, end)),
         child: new InkWell(
-          onTap: () { Navigator.of(context).pop(route.items[i].value); },
+          onTap: () => Navigator.pop(context, route.items[i].value),
           child: route.items[i]
         ))
       );
@@ -63,24 +54,26 @@ class _PopupMenu extends StatelessComponent {
       builder: (BuildContext context) {
         return new Opacity(
           opacity: opacity.value,
-          child: new CustomPaint(
-            onPaint: (ui.Canvas canvas, Size size) {
-              double widthValue = width.value * size.width;
-              double heightValue = height.value * size.height;
-              painter.paint(canvas, new Rect.fromLTWH(size.width - widthValue, 0.0, widthValue, heightValue));
-            },
-            child: new ConstrainedBox(
-              constraints: new BoxConstraints(
-                minWidth: _kMenuMinWidth,
-                maxWidth: _kMenuMaxWidth
-              ),
-              child: new IntrinsicWidth(
-                stepWidth: _kMenuWidthStep,
-                child: new Block(
-                  children,
-                  padding: const EdgeDims.symmetric(
-                    horizontal: _kMenuHorizontalPadding,
-                    vertical: _kMenuVerticalPadding
+          child: new Material(
+            type: MaterialType.card,
+            elevation: route.elevation,
+            child: new Align(
+              alignment: const FractionalOffset(1.0, 0.0),
+              widthFactor: width.value,
+              heightFactor: height.value,
+              child: new ConstrainedBox(
+                constraints: new BoxConstraints(
+                  minWidth: _kMenuMinWidth,
+                  maxWidth: _kMenuMaxWidth
+                ),
+                child: new IntrinsicWidth(
+                  stepWidth: _kMenuWidthStep,
+                  child: new Block(
+                    children,
+                    padding: const EdgeDims.symmetric(
+                      horizontal: _kMenuHorizontalPadding,
+                      vertical: _kMenuVerticalPadding
+                    )
                   )
                 )
               )
@@ -92,12 +85,17 @@ class _PopupMenu extends StatelessComponent {
   }
 }
 
-class _MenuRoute extends ModalRoute {
-  _MenuRoute({ Completer completer, this.position, this.items, this.level }) : super(completer: completer);
+class _PopupMenuRoute<T> extends PopupRoute<T> {
+  _PopupMenuRoute({
+    Completer<T> completer,
+    this.position,
+    this.items,
+    this.elevation
+  }) : super(completer: completer);
 
   final ModalPosition position;
-  final List<PopupMenuItem> items;
-  final int level;
+  final List<PopupMenuItem<T>> items;
+  final int elevation;
 
   Performance createPerformance() {
     Performance result = super.createPerformance();
@@ -107,19 +105,20 @@ class _MenuRoute extends ModalRoute {
     return result;
   }
 
-  bool get opaque => false;
   Duration get transitionDuration => _kMenuDuration;
+  bool get barrierDismissable => true;
+  Color get barrierColor => null;
 
   Widget buildPage(BuildContext context) => new _PopupMenu(route: this);
 }
 
-Future showMenu({ BuildContext context, ModalPosition position, List<PopupMenuItem> items, int level: 4 }) {
+Future showMenu({ BuildContext context, ModalPosition position, List<PopupMenuItem> items, int elevation: 8 }) {
   Completer completer = new Completer();
-  Navigator.of(context).pushEphemeral(new _MenuRoute(
+  Navigator.push(context, new _PopupMenuRoute(
     completer: completer,
     position: position,
     items: items,
-    level: level
+    elevation: elevation
   ));
   return completer.future;
 }

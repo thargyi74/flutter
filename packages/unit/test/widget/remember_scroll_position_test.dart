@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/animation.dart';
 import 'package:flutter/material.dart';
 import 'package:test/test.dart';
-
-import 'widget_tester.dart';
 
 class ThePositiveNumbers extends ScrollableWidgetList {
   ThePositiveNumbers() : super(itemExtent: 100.0);
@@ -75,7 +74,9 @@ void main() {
       expect(tester.findText('16'), isNull);
       expect(tester.findText('100'), isNull);
 
-      navigatorKey.currentState.pushNamed('/second');
+      navigatorKey.currentState.openTransaction(
+        (NavigatorTransaction transaction) => transaction.pushNamed('/second')
+      );
       tester.pump(); // navigating always takes two frames
       tester.pump(new Duration(seconds: 1));
 
@@ -90,7 +91,9 @@ void main() {
       expect(tester.findText('10'), isNull);
       expect(tester.findText('100'), isNull);
 
-      navigatorKey.currentState.pop();
+      navigatorKey.currentState.openTransaction(
+        (NavigatorTransaction transaction) => transaction.pop()
+      );
       tester.pump(); // navigating always takes two frames
       tester.pump(new Duration(seconds: 1));
 

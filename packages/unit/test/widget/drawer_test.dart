@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:test/test.dart';
-
-import 'widget_tester.dart';
 
 void main() {
 
@@ -30,7 +29,7 @@ void main() {
       expect(tester.findText('drawer'), isNotNull);
       tester.pump(new Duration(seconds: 1)); // animation done
       expect(tester.findText('drawer'), isNotNull);
-      Navigator.of(context).pop();
+      Navigator.pop(context);
       tester.pump(); // drawer should be starting to animate away
       expect(tester.findText('drawer'), isNotNull);
       tester.pump(new Duration(seconds: 1)); // animation done

@@ -44,6 +44,8 @@ class Overlay extends StatefulComponent {
 
   final List<OverlayEntry> initialEntries;
 
+  static OverlayState of(BuildContext context) => context.ancestorStateOfType(OverlayState);
+
   OverlayState createState() => new OverlayState();
 }
 
@@ -52,8 +54,7 @@ class OverlayState extends State<Overlay> {
 
   void initState() {
     super.initState();
-    for (OverlayEntry entry in config.initialEntries)
-      insert(entry);
+    insertAll(config.initialEntries);
   }
 
   void insert(OverlayEntry entry, { OverlayEntry above }) {
@@ -66,10 +67,42 @@ class OverlayState extends State<Overlay> {
     });
   }
 
+  void insertAll(Iterable<OverlayEntry> entries, { OverlayEntry above }) {
+    assert(above == null || (above._state == this && _entries.contains(above)));
+    for (OverlayEntry entry in entries) {
+      assert(entry._state == null);
+      entry._state = this;
+    }
+    setState(() {
+      int index = above == null ? _entries.length : _entries.indexOf(above) + 1;
+      _entries.insertAll(index, entries);
+    });
+  }
+
   void _remove(OverlayEntry entry) {
     setState(() {
       _entries.remove(entry);
     });
+  }
+
+  bool debugIsVisible(OverlayEntry entry) {
+    bool result = false;
+    assert(_entries.contains(entry));
+    assert(() {
+      // This is an O(N) algorithm, and should not be necessary except for debug asserts.
+      // To avoid people depending on it, we only implement it in checked mode.
+      for (int i = _entries.length - 1; i > 0; i -= 1) {
+        OverlayEntry candidate = _entries[i];
+        if (candidate == entry) {
+          result = true;
+          break;
+        }
+        if (entry.opaque)
+          break;
+      }
+      return true;
+    });
+    return result;
   }
 
   Widget build(BuildContext context) {

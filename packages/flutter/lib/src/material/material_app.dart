@@ -59,7 +59,7 @@ class MaterialApp extends StatefulComponent {
   _MaterialAppState createState() => new _MaterialAppState();
 }
 
-class _MaterialAppState extends State<MaterialApp> {
+class _MaterialAppState extends State<MaterialApp> implements BindingObserver {
 
   GlobalObjectKey _navigator;
 
@@ -68,30 +68,27 @@ class _MaterialAppState extends State<MaterialApp> {
   void initState() {
     super.initState();
     _navigator = new GlobalObjectKey(this);
-    WidgetFlutterBinding.instance.addEventListener(_backHandler);
     _size = ui.window.size;
-    FlutterBinding.instance.addMetricListener(_metricHandler);
+    FlutterBinding.instance.addObserver(this);
   }
 
   void dispose() {
-    WidgetFlutterBinding.instance.removeEventListener(_backHandler);
-    FlutterBinding.instance.removeMetricListener(_metricHandler);
+    FlutterBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  void _backHandler(InputEvent event) {
+  bool didPopRoute() {
     assert(mounted);
-    if (event.type == 'back') {
-      NavigatorState navigator = _navigator.currentState;
-      assert(navigator != null);
-      if (navigator.hasPreviousRoute)
-        navigator.pop();
-      else
+    NavigatorState navigator = _navigator.currentState;
+    assert(navigator != null);
+    navigator.openTransaction((NavigatorTransaction transaction) {
+      if (!transaction.pop())
         activity.finishCurrentActivity();
-    }
+    });
+    return true;
   }
 
-  void _metricHandler(Size size) => setState(() { _size = size; });
+  void didChangeSize(Size size) => setState(() { _size = size; });
 
   final HeroController _heroController = new HeroController();
 
@@ -118,6 +115,7 @@ class _MaterialAppState extends State<MaterialApp> {
               title: config.title,
               child: new Navigator(
                 key: _navigator,
+                initialRoute: ui.window.defaultRouteName,
                 onGenerateRoute: _generateRoute,
                 observer: _heroController
               )

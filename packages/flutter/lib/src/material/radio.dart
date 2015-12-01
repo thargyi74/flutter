@@ -4,10 +4,16 @@
 
 import 'dart:ui' as ui;
 
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
-import 'colors.dart';
+import 'constants.dart';
 import 'theme.dart';
+import 'toggleable.dart';
+
+const double _kDiameter = 16.0;
+const double _kOuterRadius = _kDiameter / 2.0;
+const double _kInnerRadius = 5.0;
 
 class Radio<T> extends StatelessComponent {
   Radio({
@@ -21,48 +27,96 @@ class Radio<T> extends StatelessComponent {
   final T groupValue;
   final ValueChanged<T> onChanged;
 
-  bool get enabled => onChanged != null;
+  bool get _enabled => onChanged != null;
 
-  Color _getColor(BuildContext context) {
-    ThemeData themeData = Theme.of(context);
-    if (!enabled)
-      return themeData.brightness == ThemeBrightness.light ? Colors.black26 : Colors.white30;
-    if (value == groupValue)
-      return themeData.accentColor;
-    return themeData.brightness == ThemeBrightness.light ? Colors.black54 : Colors.white70;
+  Color _getInactiveColor(ThemeData themeData) {
+    return _enabled ? themeData.unselectedColor : themeData.disabledColor;
+  }
+
+  void _handleChanged(bool selected) {
+    if (selected)
+      onChanged(value);
   }
 
   Widget build(BuildContext context) {
-    const double kDiameter = 16.0;
-    const double kOuterRadius = kDiameter / 2;
-    const double kInnerRadius = 5.0;
-    return new GestureDetector(
-      onTap: enabled ? () => onChanged(value) : null,
-      child: new Container(
-        margin: const EdgeDims.symmetric(horizontal: 5.0),
-        width: kDiameter,
-        height: kDiameter,
-        child: new CustomPaint(
-          onPaint: (Canvas canvas, Size size) {
-
-            // TODO(ianh): ink radial reaction
-
-            // Draw the outer circle
-            Paint paint = new Paint()
-              ..color = _getColor(context)
-              ..style = ui.PaintingStyle.stroke
-              ..strokeWidth = 2.0;
-            canvas.drawCircle(const Point(kOuterRadius, kOuterRadius), kOuterRadius, paint);
-
-            // Draw the inner circle
-            if (value == groupValue) {
-              paint.style = ui.PaintingStyle.fill;
-              canvas.drawCircle(const Point(kOuterRadius, kOuterRadius), kInnerRadius, paint);
-            }
-
-          }
-        )
-      )
+    ThemeData themeData = Theme.of(context);
+    return new _RadioRenderObjectWidget(
+      selected: value == groupValue,
+      activeColor: themeData.accentColor,
+      inactiveColor: _getInactiveColor(themeData),
+      onChanged: _enabled ? _handleChanged : null
     );
+  }
+}
+
+class _RadioRenderObjectWidget extends LeafRenderObjectWidget {
+  _RadioRenderObjectWidget({
+    Key key,
+    this.selected,
+    this.activeColor,
+    this.inactiveColor,
+    this.onChanged
+  }) : super(key: key) {
+    assert(selected != null);
+    assert(activeColor != null);
+    assert(inactiveColor != null);
+  }
+
+  final bool selected;
+  final Color inactiveColor;
+  final Color activeColor;
+  final ValueChanged<bool> onChanged;
+
+  _RenderRadio createRenderObject() => new _RenderRadio(
+    value: selected,
+    activeColor: activeColor,
+    inactiveColor: inactiveColor,
+    onChanged: onChanged
+  );
+
+  void updateRenderObject(_RenderRadio renderObject, _RadioRenderObjectWidget oldWidget) {
+    renderObject.value = selected;
+    renderObject.activeColor = activeColor;
+    renderObject.inactiveColor = inactiveColor;
+    renderObject.onChanged = onChanged;
+  }
+}
+
+class _RenderRadio extends RenderToggleable {
+  _RenderRadio({
+    bool value,
+    Color activeColor,
+    Color inactiveColor,
+    ValueChanged<bool> onChanged
+  }): super(
+    value: value,
+    activeColor: activeColor,
+    inactiveColor: inactiveColor,
+    onChanged: onChanged,
+    size: const Size(2 * kRadialReactionRadius, 2 * kRadialReactionRadius)
+  );
+
+  bool get isInteractive => super.isInteractive && !value;
+
+  void paint(PaintingContext context, Offset offset) {
+    final Canvas canvas = context.canvas;
+
+    paintRadialReaction(canvas, offset + const Offset(kRadialReactionRadius, kRadialReactionRadius));
+
+    Point center = (offset & size).center;
+    Color radioColor = onChanged != null ? activeColor : inactiveColor;
+
+    // Outer circle
+    Paint paint = new Paint()
+      ..color = Color.lerp(inactiveColor, radioColor, position.value)
+      ..style = ui.PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawCircle(center, _kOuterRadius, paint);
+
+    // Inner circle
+    if (!position.isDismissed) {
+      paint.style = ui.PaintingStyle.fill;
+      canvas.drawCircle(center, _kInnerRadius * position.value, paint);
+    }
   }
 }

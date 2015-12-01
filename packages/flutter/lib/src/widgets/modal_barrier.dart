@@ -9,12 +9,10 @@ import 'framework.dart';
 import 'navigator.dart';
 import 'transitions.dart';
 
-const Color kTransparent = const Color(0x00000000);
-
 class ModalBarrier extends StatelessComponent {
   ModalBarrier({
     Key key,
-    this.color: kTransparent,
+    this.color,
     this.dismissable: true
   }) : super(key: key);
 
@@ -25,11 +23,12 @@ class ModalBarrier extends StatelessComponent {
     return new Listener(
       onPointerDown: (_) {
         if (dismissable)
-          Navigator.of(context).pop();
+          Navigator.pop(context);
       },
+      behavior: HitTestBehavior.opaque,
       child: new ConstrainedBox(
         constraints: const BoxConstraints.expand(),
-        child: new DecoratedBox(
+        child: color == null ? null : new DecoratedBox(
           decoration: new BoxDecoration(
             backgroundColor: color
           )

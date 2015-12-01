@@ -58,7 +58,7 @@ class StockSymbolPage extends StatelessComponent {
         left: new IconButton(
           icon: 'navigation/arrow_back',
           onPressed: () {
-            Navigator.of(context).pop();
+            Navigator.pop(context);
           }
         ),
         center: new Text(stock.name)
@@ -80,11 +80,11 @@ class StockSymbolBottomSheet extends StatelessComponent {
 
   Widget build(BuildContext context) {
     return new Container(
-      child: new StockSymbolView(stock: stock),
       padding: new EdgeDims.all(10.0),
       decoration: new BoxDecoration(
         border: new Border(top: new BorderSide(color: Colors.black26, width: 1.0))
-      )
+      ),
+      child: new StockSymbolView(stock: stock)
    );
   }
 }

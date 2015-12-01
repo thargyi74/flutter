@@ -83,7 +83,7 @@ class UpdateTask {
 
   Future<yaml.YamlMap> _fetchManifest() async {
     String manifestUrl = _currentManifest['update-url'] + '/' + kManifestFile;
-    String manifestData = await http.get(manifestUrl);
+    String manifestData = (await http.get(manifestUrl)).body;
     return yaml.loadYaml(manifestData, sourceUrl: manifestUrl);
   }
 
@@ -98,8 +98,8 @@ class UpdateTask {
     _tempPath = path.join(_dataDir, 'tmp.skyx');
     String bundleUrl = _currentManifest['update-url'] + '/' + kBundleFile;
     UrlResponse response = await fetchUrl(bundleUrl);
-    MojoResult result = await PipeToFile.copyToFile(response.body, _tempPath);
-    if (!result.isOk)
+    int result = await PipeToFile.copyToFile(response.body, _tempPath);
+    if (result != MojoResult.kOk)
       throw new UpdateFailure('Failure fetching new package: ${response.statusLine}');
   }
 

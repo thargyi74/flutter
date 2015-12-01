@@ -102,7 +102,7 @@ class Dialog extends StatelessComponent {
         child: new ConstrainedBox(
           constraints: new BoxConstraints(minWidth: 280.0),
           child: new Material(
-            level: 4,
+            elevation: 24,
             color: _getColor(context),
             type: MaterialType.card,
             child: new IntrinsicWidth(
@@ -115,13 +115,16 @@ class Dialog extends StatelessComponent {
   }
 }
 
-class _DialogRoute extends ModalRoute {
-  _DialogRoute({ Completer completer, this.child }) : super(completer: completer);
+class _DialogRoute<T> extends PopupRoute<T> {
+  _DialogRoute({
+    Completer<T> completer,
+    this.child
+  }) : super(completer: completer);
 
   final Widget child;
 
-  bool get opaque => false;
   Duration get transitionDuration => const Duration(milliseconds: 150);
+  bool get barrierDismissable => true;
   Color get barrierColor => Colors.black54;
 
   Widget buildPage(BuildContext context) => child;
@@ -137,6 +140,6 @@ class _DialogRoute extends ModalRoute {
 
 Future showDialog({ BuildContext context, Widget child }) {
   Completer completer = new Completer();
-  Navigator.of(context).push(new _DialogRoute(completer: completer, child: child));
+  Navigator.push(context, new _DialogRoute(completer: completer, child: child));
   return completer.future;
 }

@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:mojo_services/keyboard/keyboard.mojom.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/material.dart';
+import 'package:mojo_services/keyboard/keyboard.mojom.dart';
 import 'package:test/test.dart';
 
-import 'widget_tester.dart';
 import '../services/mock_services.dart';
 
 class MockKeyboard implements KeyboardService {
@@ -136,6 +136,29 @@ void main() {
       // remain at zero.
       mockKeyboard.client.deleteSurroundingText(1, 0);
       expect(input.editableValue.selection.start, equals(0));
+    });
+  });
+
+  test('hideText control test', () {
+    testWidgets((WidgetTester tester) {
+      GlobalKey inputKey = new GlobalKey();
+
+      Widget builder() {
+        return new Center(
+          child: new Input(
+            key: inputKey,
+            hideText: true,
+            placeholder: 'Placeholder'
+          )
+        );
+      }
+
+      tester.pumpWidget(builder());
+
+      const String testValue = 'ABC';
+      mockKeyboard.client.commitText(testValue, testValue.length);
+
+      tester.pump();
     });
   });
 }

@@ -6,6 +6,9 @@ import 'dart:ui' as ui;
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:flutter/painting.dart';
+import 'package:vector_math/vector_math_64.dart';
+
 /// Causes each RenderBox to paint a box around its bounds.
 bool debugPaintSizeEnabled = false;
 
@@ -27,9 +30,6 @@ bool debugPaintLayerBordersEnabled = false;
 /// The color to use when painting Layer borders.
 ui.Color debugPaintLayerBordersColor = const ui.Color(0xFFFF9800);
 
-/// Causes RenderObjects to paint warnings when painting outside their bounds.
-bool debugPaintBoundsEnabled = false;
-
 /// Causes RenderBox objects to flash while they are being tapped
 bool debugPaintPointersEnabled = false;
 
@@ -38,6 +38,21 @@ int debugPaintPointersColorValue = 0x00BBBB;
 
 /// The color to use when painting RenderError boxes in checked mode.
 ui.Color debugErrorBoxColor = const ui.Color(0xFFFF0000);
+
+/// Overlay a rotating set of colors when repainting layers in checked mode.
+bool debugEnableRepaintRainbox = false;
+
+/// The current color to overlay when repainting a layer.
+HSVColor debugCurrentRepaintColor = const HSVColor.fromAHSV(0.4, 60.0, 1.0, 1.0);
+
+/// The amount to increment the hue of the current repaint color.
+double debugRepaintRainboxHueIncrement = 2.0;
+
+List<String> debugDescribeTransform(Matrix4 transform) {
+  List<String> matrix = transform.toString().split('\n').map((String s) => '  $s').toList();
+  matrix.removeLast();
+  return matrix;
+}
 
 /// Prints a message to the console, which you can access using the "flutter"
 /// tool's "logs" command ("flutter logs").

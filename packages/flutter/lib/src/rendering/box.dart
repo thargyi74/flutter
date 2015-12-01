@@ -13,7 +13,7 @@ import 'package:vector_math/vector_math_64.dart';
 import 'debug.dart';
 import 'object.dart';
 
-export 'package:flutter/painting.dart' show TextBaseline;
+export 'package:flutter/painting.dart' show FractionalOffset, TextBaseline;
 
 // This class should only be used in debug builds
 class _DebugSize extends Size {
@@ -287,6 +287,8 @@ class BoxHitTestEntry extends HitTestEntry {
 
 /// Parent data used by [RenderBox] and its subclasses
 class BoxParentData extends ParentData {
+  // TODO(abarth): Switch to using an Offset rather than a Point here. This
+  //               value is really the offset from the parent.
   Point _position = Point.origin;
   /// The point at which to paint the child in the parent's coordinate system
   Point get position => _position;
@@ -294,6 +296,7 @@ class BoxParentData extends ParentData {
     assert(RenderObject.debugDoingLayout);
     _position = value;
   }
+  Offset get offset => _position.toOffset();
   String toString() => 'position=$position';
 }
 
@@ -771,43 +774,10 @@ abstract class RenderBoxContainerDefaultsMixin<ChildType extends RenderBox, Pare
     RenderBox child = firstChild;
     while (child != null) {
       final ParentDataType childParentData = child.parentData;
-      context.paintChild(child, childParentData.position + offset);
+      context.paintChild(child, childParentData.offset + offset);
       child = childParentData.nextSibling;
     }
   }
-}
-
-/// An offset that's expressed as a fraction of a Size.
-///
-/// FractionalOffset(1.0, 0.0) represents the top right of the Size,
-/// FractionalOffset(0.0, 1.0) represents the bottom left of the Size,
-class FractionalOffset {
-  const FractionalOffset(this.x, this.y);
-  final double x;
-  final double y;
-  bool operator ==(dynamic other) {
-    if (other is! FractionalOffset)
-      return false;
-    final FractionalOffset typedOther = other;
-    return x == typedOther.x &&
-           y == typedOther.y;
-  }
-  int get hashCode {
-    int value = 373;
-    value = 37 * value + x.hashCode;
-    value = 37 * value + y.hashCode;
-    return value;
-  }
-  static FractionalOffset lerp(FractionalOffset a, FractionalOffset b, double t) {
-    if (a == null && b == null)
-      return null;
-    if (a == null)
-      return new FractionalOffset(b.x * t, b.y * t);
-    if (b == null)
-      return new FractionalOffset(b.x * (1.0 - t), b.y * (1.0 - t));
-    return new FractionalOffset(ui.lerpDouble(a.x, b.x, t), ui.lerpDouble(a.y, b.y, t));
-  }
-  String toString() => '$runtimeType($x, $y)';
 }
 
 class AnimatedFractionalOffsetValue extends AnimatedValue<FractionalOffset> {

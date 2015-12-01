@@ -2,28 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
-import 'radial_reaction.dart';
+import 'colors.dart';
+import 'constants.dart';
 import 'shadows.dart';
 import 'theme.dart';
-
-const Color _kThumbOffColor = const Color(0xFFFAFAFA);
-const Color _kTrackOffColor = const Color(0x42000000);
-const double _kSwitchWidth = 35.0;
-const double _kThumbRadius = 10.0;
-const double _kSwitchHeight = _kThumbRadius * 2.0;
-const double _kTrackHeight = 14.0;
-const double _kTrackRadius = _kTrackHeight / 2.0;
-const double _kTrackWidth =
-    _kSwitchWidth - (_kThumbRadius - _kTrackRadius) * 2.0;
-const Size _kSwitchSize = const Size(_kSwitchWidth + 2.0, _kSwitchHeight + 2.0);
-const double _kReactionRadius = _kSwitchWidth / 2.0;
+import 'toggleable.dart';
 
 class Switch extends StatelessComponent {
   Switch({ Key key, this.value, this.onChanged })
@@ -33,117 +23,194 @@ class Switch extends StatelessComponent {
   final ValueChanged<bool> onChanged;
 
   Widget build(BuildContext context) {
-    return new _SwitchWrapper(
+    ThemeData themeData = Theme.of(context);
+    final isDark = themeData.brightness == ThemeBrightness.dark;
+
+    Color activeThumbColor = themeData.accentColor;
+    Color activeTrackColor = activeThumbColor.withAlpha(0x80);
+
+    Color inactiveThumbColor;
+    Color inactiveTrackColor;
+    if (onChanged != null) {
+      inactiveThumbColor = isDark ? Colors.grey[400] : Colors.grey[50];
+      inactiveTrackColor = isDark ? Colors.white30 : Colors.black26;
+    } else {
+      inactiveThumbColor = isDark ? Colors.grey[800] : Colors.grey[400];
+      inactiveTrackColor = isDark ? Colors.white10 : Colors.black12;
+    }
+
+    return new _SwitchRenderObjectWidget(
       value: value,
-      thumbColor: Theme.of(context).accentColor,
+      activeColor: activeThumbColor,
+      inactiveColor: inactiveThumbColor,
+      activeTrackColor: activeTrackColor,
+      inactiveTrackColor: inactiveTrackColor,
       onChanged: onChanged
     );
   }
 }
 
-class _SwitchWrapper extends LeafRenderObjectWidget {
-  _SwitchWrapper({ Key key, this.value, this.thumbColor, this.onChanged })
-      : super(key: key);
+class _SwitchRenderObjectWidget extends LeafRenderObjectWidget {
+  _SwitchRenderObjectWidget({
+    Key key,
+    this.value,
+    this.activeColor,
+    this.inactiveColor,
+    this.activeTrackColor,
+    this.inactiveTrackColor,
+    this.onChanged
+  }) : super(key: key);
 
   final bool value;
-  final Color thumbColor;
+  final Color activeColor;
+  final Color inactiveColor;
+  final Color activeTrackColor;
+  final Color inactiveTrackColor;
   final ValueChanged<bool> onChanged;
 
   _RenderSwitch createRenderObject() => new _RenderSwitch(
     value: value,
-    thumbColor: thumbColor,
+    activeColor: activeColor,
+    inactiveColor: inactiveColor,
+    activeTrackColor: activeTrackColor,
+    inactiveTrackColor: inactiveTrackColor,
     onChanged: onChanged
   );
 
-  void updateRenderObject(_RenderSwitch renderObject, _SwitchWrapper oldWidget) {
+  void updateRenderObject(_RenderSwitch renderObject, _SwitchRenderObjectWidget oldWidget) {
     renderObject.value = value;
-    renderObject.thumbColor = thumbColor;
+    renderObject.activeColor = activeColor;
+    renderObject.inactiveColor = inactiveColor;
+    renderObject.activeTrackColor = activeTrackColor;
+    renderObject.inactiveTrackColor = inactiveTrackColor;
     renderObject.onChanged = onChanged;
   }
 }
 
+const double _kTrackHeight = 14.0;
+const double _kTrackWidth = 29.0;
+const double _kTrackRadius = _kTrackHeight / 2.0;
+const double _kThumbRadius = 10.0;
+const double _kSwitchWidth = _kTrackWidth - 2 * _kTrackRadius + 2 * kRadialReactionRadius;
+const double _kSwitchHeight = 2 * kRadialReactionRadius;
+
 class _RenderSwitch extends RenderToggleable {
   _RenderSwitch({
     bool value,
-    Color thumbColor: _kThumbOffColor,
+    Color activeColor,
+    Color inactiveColor,
+    Color activeTrackColor,
+    Color inactiveTrackColor,
     ValueChanged<bool> onChanged
-  }) : _thumbColor = thumbColor,
-        super(value: value, onChanged: onChanged, size: _kSwitchSize);
+  }) : super(
+     value: value,
+     activeColor: activeColor,
+     inactiveColor: inactiveColor,
+     onChanged: onChanged,
+     minRadialReactionRadius: _kThumbRadius,
+     size: const Size(_kSwitchWidth, _kSwitchHeight)
+   ) {
+    _drag = new HorizontalDragGestureRecognizer(router: FlutterBinding.instance.pointerRouter)
+      ..onStart = _handleDragStart
+      ..onUpdate = _handleDragUpdate
+      ..onEnd = _handleDragEnd;
+  }
 
-  Color _thumbColor;
-  Color get thumbColor => _thumbColor;
-  void set thumbColor(Color value) {
-    if (value == _thumbColor) return;
-    _thumbColor = value;
+  Color get activeTrackColor => _activeTrackColor;
+  Color _activeTrackColor;
+  void set activeTrackColor(Color value) {
+    assert(value != null);
+    if (value == _activeTrackColor)
+      return;
+    _activeTrackColor = value;
     markNeedsPaint();
   }
 
-  RadialReaction _radialReaction;
+  Color get inactiveTrackColor => _inactiveTrackColor;
+  Color _inactiveTrackColor;
+  void set inactiveTrackColor(Color value) {
+    assert(value != null);
+    if (value == _inactiveTrackColor)
+      return;
+    _inactiveTrackColor = value;
+    markNeedsPaint();
+  }
+
+  double get _trackInnerLength => size.width - 2.0 * kRadialReactionRadius;
+
+  HorizontalDragGestureRecognizer _drag;
+
+  void _handleDragStart(Point globalPosition) {
+    if (onChanged != null)
+      reaction.forward();
+  }
+
+  void _handleDragUpdate(double delta) {
+    if (onChanged != null) {
+      position.variable
+        ..curve = null
+        ..reverseCurve = null;
+      position.progress += delta / _trackInnerLength;
+    }
+  }
+
+  void _handleDragEnd(Offset velocity) {
+    if (position.progress >= 0.5)
+      position.forward();
+    else
+      position.reverse();
+    reaction.reverse();
+  }
 
   void handleEvent(InputEvent event, BoxHitTestEntry entry) {
-    if (event is PointerInputEvent) {
-      if (event.type == 'pointerdown')
-        _showRadialReaction(entry.localPosition);
-      else if (event.type == 'pointerup')
-        _hideRadialReaction();
-    }
+    if (event.type == 'pointerdown' && onChanged != null)
+      _drag.addPointer(event);
     super.handleEvent(event, entry);
   }
 
-  void _showRadialReaction(Point startLocation) {
-    if (_radialReaction != null)
-      return;
-    _radialReaction = new RadialReaction(
-      center: new Point(_kSwitchSize.width / 2.0, _kSwitchSize.height / 2.0),
-      radius: _kReactionRadius,
-      startPosition: startLocation
-    )..addListener(markNeedsPaint)
-     ..show();
-  }
-
-  Future _hideRadialReaction() async {
-    if (_radialReaction == null)
-      return;
-    await _radialReaction.hide();
-    _radialReaction = null;
-  }
+  final BoxPainter _thumbPainter = new BoxPainter(const BoxDecoration());
 
   void paint(PaintingContext context, Offset offset) {
     final PaintingCanvas canvas = context.canvas;
-    Color thumbColor = _kThumbOffColor;
-    Color trackColor = _kTrackOffColor;
-    if (value) {
-      thumbColor = _thumbColor;
-      trackColor = new Color(_thumbColor.value & 0x80FFFFFF);
-    }
 
-    // Draw the track rrect
+    final bool isActive = onChanged != null;
+
+    Color thumbColor = isActive ? Color.lerp(inactiveColor, activeColor, position.progress) : inactiveColor;
+    Color trackColor = isActive ? Color.lerp(inactiveTrackColor, activeTrackColor, position.progress) : inactiveTrackColor;
+
+    // Paint the track
     Paint paint = new Paint()
-      ..color = trackColor
-      ..style = ui.PaintingStyle.fill;
-    Rect rect = new Rect.fromLTWH(offset.dx,
-        offset.dy + _kSwitchHeight / 2.0 - _kTrackHeight / 2.0, _kTrackWidth,
-        _kTrackHeight);
-    ui.RRect rrect = new ui.RRect.fromRectXY(
-        rect, _kTrackRadius, _kTrackRadius);
-    canvas.drawRRect(rrect, paint);
+      ..color = trackColor;
+    double trackHorizontalPadding = kRadialReactionRadius - _kTrackRadius;
+    Rect trackRect = new Rect.fromLTWH(
+      offset.dx + trackHorizontalPadding,
+      offset.dy + (size.height - _kTrackHeight) / 2.0,
+      size.width - 2.0 * trackHorizontalPadding,
+      _kTrackHeight
+    );
+    ui.RRect trackRRect = new ui.RRect.fromRectXY(
+        trackRect, _kTrackRadius, _kTrackRadius);
+    canvas.drawRRect(trackRRect, paint);
 
-    if (_radialReaction != null)
-      _radialReaction.paint(canvas, offset);
+    Offset thumbOffset = new Offset(
+      offset.dx + kRadialReactionRadius + position.value * _trackInnerLength,
+      offset.dy + size.height / 2.0);
 
-    // Draw the raised thumb with a shadow
-    paint.color = thumbColor;
-    ShadowDrawLooperBuilder builder = new ShadowDrawLooperBuilder();
-    for (BoxShadow boxShadow in shadows[1])
-      builder.addShadow(boxShadow.offset, boxShadow.color, boxShadow.blur);
-    paint.drawLooper = builder.build();
+    paintRadialReaction(canvas, thumbOffset);
+
+    _thumbPainter.decoration = new BoxDecoration(
+      backgroundColor: thumbColor,
+      shape: Shape.circle,
+      boxShadow: elevationToShadow[1]
+    );
 
     // The thumb contracts slightly during the animation
-    double inset = 2.0 - (position - 0.5).abs() * 2.0;
-    Point thumbPos = new Point(offset.dx +
-            _kTrackRadius +
-            position * (_kTrackWidth - _kTrackRadius * 2),
-        offset.dy + _kSwitchHeight / 2.0);
-    canvas.drawCircle(thumbPos, _kThumbRadius - inset, paint);
+    double inset = 2.0 - (position.value - 0.5).abs() * 2.0;
+    double radius = _kThumbRadius - inset;
+    Rect thumbRect = new Rect.fromLTRB(thumbOffset.dx - radius,
+                                       thumbOffset.dy - radius,
+                                       thumbOffset.dx + radius,
+                                       thumbOffset.dy + radius);
+    _thumbPainter.paint(canvas, thumbRect);
   }
 }

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
@@ -10,7 +9,6 @@ import 'package:flutter/services.dart';
 
 import 'framework.dart';
 
-export 'dart:typed_data' show Uint8List;
 export 'package:flutter/rendering.dart' show
     BackgroundImage,
     BlockDirection,
@@ -23,6 +21,7 @@ export 'package:flutter/rendering.dart' show
     Canvas,
     Color,
     ColorFilter,
+    CustomPainter,
     EdgeDims,
     FlexAlignItems,
     FlexDirection,
@@ -138,36 +137,21 @@ class DecoratedBox extends OneChildRenderObjectWidget {
 }
 
 class CustomPaint extends OneChildRenderObjectWidget {
-  CustomPaint({ Key key, this.onPaint, this.onHitTest, this.token, Widget child })
+  CustomPaint({ Key key, this.painter, Widget child })
     : super(key: key, child: child) {
-    assert(onPaint != null);
+    assert(painter != null);
   }
 
-  /// This widget repaints whenver you supply a new onPaint callback.
-  ///
-  /// If you use an anonymous closure for the onPaint callback, you'll trigger
-  /// a repaint every time you build this widget, which might not be what you
-  /// intend. Instead, consider passing a reference to a member function, which
-  /// has a more stable identity.
-  final CustomPaintCallback onPaint;
+  final CustomPainter painter;
 
-  final CustomHitTestCallback onHitTest;
-
-  /// This widget repaints whenever you supply a new token.
-  final Object token;
-
-  RenderCustomPaint createRenderObject() => new RenderCustomPaint(onPaint: onPaint, onHitTest: onHitTest);
+  RenderCustomPaint createRenderObject() => new RenderCustomPaint(painter: painter);
 
   void updateRenderObject(RenderCustomPaint renderObject, CustomPaint oldWidget) {
-    if (oldWidget.token != token)
-      renderObject.markNeedsPaint();
-    renderObject.onPaint = onPaint;
-    renderObject.onHitTest = onHitTest;
+    renderObject.painter = painter;
   }
 
   void didUnmountRenderObject(RenderCustomPaint renderObject) {
-    renderObject.onPaint = null;
-    renderObject.onHitTest = null;
+    renderObject.painter = null;
   }
 }
 
@@ -749,6 +733,8 @@ class Positioned extends ParentDataWidget {
        top = rect.top,
        width = rect.width,
        height = rect.height,
+       right = null,
+       bottom = null,
        super(key: key, child: child);
 
   final double top;
@@ -970,7 +956,7 @@ class DefaultTextStyle extends InheritedWidget {
   final TextStyle style;
 
   static TextStyle of(BuildContext context) {
-    DefaultTextStyle result = context.inheritedWidgetOfType(DefaultTextStyle);
+    DefaultTextStyle result = context.inheritFromWidgetOfType(DefaultTextStyle);
     return result?.style;
   }
 
@@ -1019,6 +1005,7 @@ class Image extends LeafRenderObjectWidget {
     this.height,
     this.colorFilter,
     this.fit,
+    this.alignment,
     this.repeat: ImageRepeat.noRepeat,
     this.centerSlice
   }) : super(key: key);
@@ -1028,6 +1015,7 @@ class Image extends LeafRenderObjectWidget {
   final double height;
   final ColorFilter colorFilter;
   final ImageFit fit;
+  final FractionalOffset alignment;
   final ImageRepeat repeat;
   final Rect centerSlice;
 
@@ -1037,6 +1025,7 @@ class Image extends LeafRenderObjectWidget {
     height: height,
     colorFilter: colorFilter,
     fit: fit,
+    alignment: alignment,
     repeat: repeat,
     centerSlice: centerSlice);
 
@@ -1045,6 +1034,7 @@ class Image extends LeafRenderObjectWidget {
     renderObject.width = width;
     renderObject.height = height;
     renderObject.colorFilter = colorFilter;
+    renderObject.alignment = alignment;
     renderObject.fit = fit;
     renderObject.repeat = repeat;
     renderObject.centerSlice = centerSlice;
@@ -1059,6 +1049,7 @@ class ImageListener extends StatefulComponent {
     this.height,
     this.colorFilter,
     this.fit,
+    this.alignment,
     this.repeat: ImageRepeat.noRepeat,
     this.centerSlice
   }) : super(key: key) {
@@ -1070,6 +1061,7 @@ class ImageListener extends StatefulComponent {
   final double height;
   final ColorFilter colorFilter;
   final ImageFit fit;
+  final FractionalOffset alignment;
   final ImageRepeat repeat;
   final Rect centerSlice;
 
@@ -1109,6 +1101,7 @@ class _ImageListenerState extends State<ImageListener> {
       height: config.height,
       colorFilter: config.colorFilter,
       fit: config.fit,
+      alignment: config.alignment,
       repeat: config.repeat,
       centerSlice: config.centerSlice
     );
@@ -1123,6 +1116,7 @@ class NetworkImage extends StatelessComponent {
     this.height,
     this.colorFilter,
     this.fit,
+    this.alignment,
     this.repeat: ImageRepeat.noRepeat,
     this.centerSlice
   }) : super(key: key);
@@ -1132,6 +1126,7 @@ class NetworkImage extends StatelessComponent {
   final double height;
   final ColorFilter colorFilter;
   final ImageFit fit;
+  final FractionalOffset alignment;
   final ImageRepeat repeat;
   final Rect centerSlice;
 
@@ -1142,6 +1137,7 @@ class NetworkImage extends StatelessComponent {
       height: height,
       colorFilter: colorFilter,
       fit: fit,
+      alignment: alignment,
       repeat: repeat,
       centerSlice: centerSlice
     );
@@ -1161,41 +1157,43 @@ class DefaultAssetBundle extends InheritedWidget {
   final AssetBundle bundle;
 
   static AssetBundle of(BuildContext context) {
-    DefaultAssetBundle result = context.inheritedWidgetOfType(DefaultAssetBundle);
+    DefaultAssetBundle result = context.inheritFromWidgetOfType(DefaultAssetBundle);
     return result?.bundle;
   }
 
   bool updateShouldNotify(DefaultAssetBundle old) => bundle != old.bundle;
 }
 
-class RawImage extends StatelessComponent {
-  RawImage({
+class AsyncImage extends StatelessComponent {
+  AsyncImage({
     Key key,
-    this.bytes,
+    this.provider,
     this.width,
     this.height,
     this.colorFilter,
     this.fit,
+    this.alignment,
     this.repeat: ImageRepeat.noRepeat,
     this.centerSlice
   }) : super(key: key);
 
-  final Uint8List bytes;
+  final ImageProvider provider;
   final double width;
   final double height;
   final ColorFilter colorFilter;
   final ImageFit fit;
+  final FractionalOffset alignment;
   final ImageRepeat repeat;
   final Rect centerSlice;
 
   Widget build(BuildContext context) {
-    ImageResource image = new ImageResource(decodeImageFromList(bytes));
     return new ImageListener(
-      image: image,
+      image: imageCache.loadProvider(provider),
       width: width,
       height: height,
       colorFilter: colorFilter,
       fit: fit,
+      alignment: alignment,
       repeat: repeat,
       centerSlice: centerSlice
     );
@@ -1211,6 +1209,7 @@ class AssetImage extends StatelessComponent {
     this.height,
     this.colorFilter,
     this.fit,
+    this.alignment,
     this.repeat: ImageRepeat.noRepeat,
     this.centerSlice
   }) : super(key: key);
@@ -1221,6 +1220,7 @@ class AssetImage extends StatelessComponent {
   final double height;
   final ColorFilter colorFilter;
   final ImageFit fit;
+  final FractionalOffset alignment;
   final ImageRepeat repeat;
   final Rect centerSlice;
 
@@ -1231,6 +1231,7 @@ class AssetImage extends StatelessComponent {
       height: height,
       colorFilter: colorFilter,
       fit: fit,
+      alignment: alignment,
       repeat: repeat,
       centerSlice: centerSlice
     );
@@ -1317,6 +1318,11 @@ class Listener extends OneChildRenderObjectWidget {
         break;
     }
   }
+}
+
+class RepaintBoundary extends OneChildRenderObjectWidget {
+  RepaintBoundary({ Key key, Widget child }) : super(key: key, child: child);
+  RenderRepaintBoundary createRenderObject() => new RenderRepaintBoundary();
 }
 
 class IgnorePointer extends OneChildRenderObjectWidget {
