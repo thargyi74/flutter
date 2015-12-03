@@ -21,7 +21,7 @@ class StockHome extends StatefulComponent {
 
 class StockHomeState extends State<StockHome> {
 
-  final GlobalKey scaffoldKey = new GlobalKey();
+  final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
   final TabBarSelection _tabBarSelection = new TabBarSelection();
   bool _isSearching = false;
   String _searchQuery;
@@ -70,9 +70,8 @@ class StockHomeState extends State<StockHome> {
     );
   }
 
-  void _showDrawer() {
-    showDrawer(
-      context: context,
+  Widget _buildDrawer(BuildContext context) {
+    return new Drawer(
       child: new Block(<Widget>[
         new DrawerHeader(child: new Text('Stocks')),
         new DrawerItem(
@@ -146,13 +145,22 @@ class StockHomeState extends State<StockHome> {
   }
 
   Widget buildToolBar() {
+    PageRoute page = ModalRoute.of(context);
     return new ToolBar(
       elevation: 0,
       left: new IconButton(
         icon: "navigation/menu",
-        onPressed: _showDrawer
+        onPressed: () => _scaffoldKey.currentState?.openDrawer()
       ),
-      center: new Text('Stocks'),
+      center: new FadeTransition(
+        opacity: new AnimatedValue<double>(
+          1.0,
+          end: 0.0,
+          curve: const Interval(0.0, 0.5)
+        ),
+        performance: page.forwardPerformance,
+        child: new Text('Stocks')
+      ),
       right: <Widget>[
         new IconButton(
           icon: "action/search",
@@ -191,7 +199,7 @@ class StockHomeState extends State<StockHome> {
       stock.percentChange = 100.0 * (1.0 / stock.lastSale);
       stock.lastSale += 1.0;
     });
-    scaffoldKey.currentState.showSnackBar(new SnackBar(
+    _scaffoldKey.currentState.showSnackBar(new SnackBar(
       content: new Text("Purchased ${stock.symbol} for ${stock.lastSale}"),
       actions: <SnackBarAction>[
         new SnackBarAction(label: "BUY MORE", onPressed: () { _buyStock(stock, arrowKey); })
@@ -199,8 +207,9 @@ class StockHomeState extends State<StockHome> {
     ));
   }
 
-  Widget buildStockList(BuildContext context, Iterable<Stock> stocks) {
+  Widget _buildStockList(BuildContext context, Iterable<Stock> stocks, StockHomeTab tab) {
     return new StockList(
+      keySalt: tab,
       stocks: stocks.toList(),
       onAction: _buyStock,
       onOpen: (Stock stock, Key arrowKey) {
@@ -209,8 +218,15 @@ class StockHomeState extends State<StockHome> {
         Navigator.pushNamed(context, '/stock/${stock.symbol}', mostValuableKeys: mostValuableKeys);
       },
       onShow: (Stock stock, Key arrowKey) {
-        scaffoldKey.currentState.showBottomSheet((BuildContext context) => new StockSymbolBottomSheet(stock: stock));
+        _scaffoldKey.currentState.showBottomSheet((BuildContext context) => new StockSymbolBottomSheet(stock: stock));
       }
+    );
+  }
+
+  Widget _buildStockTab(BuildContext context, StockHomeTab tab, List<String> stockSymbols) {
+    return new Container(
+      key: new ValueKey<StockHomeTab>(tab),
+      child: _buildStockList(context, _filterBySearchQuery(_getStockList(stockSymbols)).toList(), tab)
     );
   }
 
@@ -259,13 +275,6 @@ class StockHomeState extends State<StockHome> {
     );
   }
 
-  Widget buildStockTab(BuildContext context, StockHomeTab tab, List<String> stockSymbols) {
-    return new Container(
-      key: new ValueKey<StockHomeTab>(tab),
-      child: buildStockList(context, _filterBySearchQuery(_getStockList(stockSymbols)).toList())
-    );
-  }
-
   double _viewWidth = 100.0;
   void _handleSizeChanged(Size newSize) {
     setState(() {
@@ -275,21 +284,22 @@ class StockHomeState extends State<StockHome> {
 
   Widget build(BuildContext context) {
     return new Scaffold(
-      key: scaffoldKey,
+      key: _scaffoldKey,
       toolBar: _isSearching ? buildSearchBar() : buildToolBar(),
       floatingActionButton: buildFloatingActionButton(),
+      drawer: _buildDrawer(context),
       body: new SizeObserver(
         onSizeChanged: _handleSizeChanged,
         child: new TabBarView<StockHomeTab>(
           selection: _tabBarSelection,
-          items: [StockHomeTab.market, StockHomeTab.portfolio],
+          items: <StockHomeTab>[StockHomeTab.market, StockHomeTab.portfolio],
           itemExtent: _viewWidth,
           itemBuilder: (BuildContext context, StockHomeTab tab, _) {
             switch (tab) {
               case StockHomeTab.market:
-                return buildStockTab(context, tab, config.symbols);
+                return _buildStockTab(context, tab, config.symbols);
               case StockHomeTab.portfolio:
-                return buildStockTab(context, tab, portfolioSymbols);
+                return _buildStockTab(context, tab, portfolioSymbols);
               default:
                 assert(false);
             }
