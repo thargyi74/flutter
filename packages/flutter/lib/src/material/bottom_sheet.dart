@@ -37,7 +37,7 @@ class BottomSheet extends StatelessComponent {
   final double childHeight;
   final WidgetBuilder builder;
 
-  static Performance createPerformance() {
+  static Performance createPerformanceController() {
     return new Performance(
       duration: _kBottomSheetDuration,
       debugLabel: 'BottomSheet'
@@ -154,11 +154,11 @@ class _ModalBottomSheetRoute<T> extends PopupRoute<T> {
   bool get barrierDismissable => true;
   Color get barrierColor => Colors.black54;
 
-  Performance createPerformance() {
-    return BottomSheet.createPerformance();
+  Performance createPerformanceController() {
+    return BottomSheet.createPerformanceController();
   }
 
-  Widget buildPage(BuildContext context) {
+  Widget buildPage(BuildContext context, PerformanceView performance, PerformanceView forwardPerformance) {
     return new _ModalBottomSheet(route: this);
   }
 }

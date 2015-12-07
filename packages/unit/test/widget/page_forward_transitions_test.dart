@@ -7,15 +7,15 @@ import 'package:flutter/animation.dart';
 import 'package:flutter/material.dart';
 import 'package:test/test.dart';
 
-import 'test_widgets.dart';
-
 class TestTransition extends TransitionComponent {
   TestTransition({
     Key key,
     this.childFirstHalf,
     this.childSecondHalf,
     PerformanceView performance
-  }) : super(key: key, performance: performance);
+  }) : super(key: key, performance: performance) {
+    assert(performance != null);
+  }
 
   final Widget childFirstHalf;
   final Widget childSecondHalf;
@@ -24,6 +24,16 @@ class TestTransition extends TransitionComponent {
     if (performance.progress >= 0.5)
       return childSecondHalf;
     return childFirstHalf;
+  }
+}
+
+class TestRoute<T> extends PageRoute<T> {
+  TestRoute(this.child);
+  final Widget child;
+  Duration get transitionDuration => kMaterialPageRouteTransitionDuration;
+  Color get barrierColor => null;
+  Widget buildPage(BuildContext context, PerformanceView performance, PerformanceView forwardPerformance) {
+    return child;
   }
 }
 
@@ -57,30 +67,33 @@ void main() {
 
       tester.pumpWidget(
         new MaterialApp(
-          routes: <String, RouteBuilder>{
-            '/': (RouteArguments args) {
-              return new Builder(
-                key: insideKey,
-                builder: (BuildContext context) {
-                  PageRoute route = ModalRoute.of(context);
-                  return new Column([
-                    new TestTransition(
-                      childFirstHalf: new Text('A'),
-                      childSecondHalf: new Text('B'),
-                      performance: route.performance
-                    ),
-                    new TestTransition(
-                      childFirstHalf: new Text('C'),
-                      childSecondHalf: new Text('D'),
-                      performance: route.forwardPerformance
-                    ),
-                  ]);
-                }
-              );
-            },
-            '/2': (RouteArguments args) => new Text('E'),
-            '/3': (RouteArguments args) => new Text('F'),
-            '/4': (RouteArguments args) => new Text('G'),
+          onGenerateRoute: (NamedRouteSettings settings) {
+            switch (settings.name) {
+              case '/':
+                return new TestRoute(
+                  new Builder(
+                    key: insideKey,
+                    builder: (BuildContext context) {
+                      PageRoute route = ModalRoute.of(context);
+                      return new Column([
+                        new TestTransition(
+                          childFirstHalf: new Text('A'),
+                          childSecondHalf: new Text('B'),
+                          performance: route.performance
+                        ),
+                        new TestTransition(
+                          childFirstHalf: new Text('C'),
+                          childSecondHalf: new Text('D'),
+                          performance: route.forwardPerformance
+                        ),
+                      ]);
+                    }
+                  )
+                );
+              case '/2': return new TestRoute(new Text('E'));
+              case '/3': return new TestRoute(new Text('F'));
+              case '/4': return new TestRoute(new Text('G'));
+            }
           }
         )
       );

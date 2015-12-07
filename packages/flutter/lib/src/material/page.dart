@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:async';
+
 import 'package:flutter/animation.dart';
 import 'package:flutter/widgets.dart';
-
-import 'colors.dart';
 
 class _MaterialPageTransition extends TransitionWithChild {
   _MaterialPageTransition({
@@ -43,8 +43,9 @@ const Duration kMaterialPageRouteTransitionDuration = const Duration(millisecond
 class MaterialPageRoute<T> extends PageRoute<T> {
   MaterialPageRoute({
     this.builder,
+    Completer<T> completer,
     NamedRouteSettings settings: const NamedRouteSettings()
-  }) : super(settings: settings) {
+  }) : super(completer: completer, settings: settings) {
     assert(builder != null);
     assert(opaque);
   }
@@ -52,10 +53,10 @@ class MaterialPageRoute<T> extends PageRoute<T> {
   final WidgetBuilder builder;
 
   Duration get transitionDuration => kMaterialPageRouteTransitionDuration;
-  bool get barrierDismissable => false;
-  Color get barrierColor => Colors.black54;
+  Color get barrierColor => null;
+  bool canTransitionFrom(TransitionRoute nextRoute) => false;
 
-  Widget buildPage(BuildContext context) {
+  Widget buildPage(BuildContext context, PerformanceView performance, PerformanceView forwardPerformance) {
     Widget result = builder(context);
     assert(() {
       if (result == null)
@@ -66,7 +67,7 @@ class MaterialPageRoute<T> extends PageRoute<T> {
     return result;
   }
 
-  Widget buildTransition(BuildContext context, PerformanceView performance, Widget child) {
+  Widget buildTransitions(BuildContext context, PerformanceView performance, PerformanceView forwardPerformance, Widget child) {
     return new _MaterialPageTransition(
       performance: performance,
       child: child

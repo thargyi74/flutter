@@ -21,6 +21,7 @@ export 'package:flutter/rendering.dart' show
     Canvas,
     Color,
     ColorFilter,
+    CustomClipper,
     CustomPainter,
     EdgeDims,
     FlexAlignItems,
@@ -42,7 +43,11 @@ export 'package:flutter/rendering.dart' show
     Path,
     PlainTextSpan,
     Point,
-    PointerInputEvent,
+    PointerCancelEvent,
+    PointerDownEvent,
+    PointerEvent,
+    PointerMoveEvent,
+    PointerUpEvent,
     RadialGradient,
     Rect,
     ScrollDirection,
@@ -137,27 +142,42 @@ class DecoratedBox extends OneChildRenderObjectWidget {
 }
 
 class CustomPaint extends OneChildRenderObjectWidget {
-  CustomPaint({ Key key, this.painter, Widget child })
-    : super(key: key, child: child) {
-    assert(painter != null);
-  }
+  CustomPaint({ Key key, this.painter, this.foregroundPainter, Widget child })
+    : super(key: key, child: child);
 
   final CustomPainter painter;
+  final CustomPainter foregroundPainter;
 
-  RenderCustomPaint createRenderObject() => new RenderCustomPaint(painter: painter);
+  RenderCustomPaint createRenderObject() => new RenderCustomPaint(
+    painter: painter,
+    foregroundPainter: foregroundPainter
+  );
 
   void updateRenderObject(RenderCustomPaint renderObject, CustomPaint oldWidget) {
     renderObject.painter = painter;
+    renderObject.foregroundPainter = foregroundPainter;
   }
 
   void didUnmountRenderObject(RenderCustomPaint renderObject) {
     renderObject.painter = null;
+    renderObject.foregroundPainter = null;
   }
 }
 
 class ClipRect extends OneChildRenderObjectWidget {
-  ClipRect({ Key key, Widget child }) : super(key: key, child: child);
-  RenderClipRect createRenderObject() => new RenderClipRect();
+  ClipRect({ Key key, this.clipper, Widget child }) : super(key: key, child: child);
+
+  final CustomClipper<Rect> clipper;
+
+  RenderClipRect createRenderObject() => new RenderClipRect(clipper: clipper);
+
+  void updateRenderObject(RenderClipRect renderObject, ClipRect oldWidget) {
+    renderObject.clipper = clipper;
+  }
+
+  void didUnmountRenderObject(RenderClipRect renderObject) {
+    renderObject.clipper = null;
+  }
 }
 
 class ClipRRect extends OneChildRenderObjectWidget {
@@ -176,8 +196,19 @@ class ClipRRect extends OneChildRenderObjectWidget {
 }
 
 class ClipOval extends OneChildRenderObjectWidget {
-  ClipOval({ Key key, Widget child }) : super(key: key, child: child);
-  RenderClipOval createRenderObject() => new RenderClipOval();
+  ClipOval({ Key key, this.clipper, Widget child }) : super(key: key, child: child);
+
+  final CustomClipper<Rect> clipper;
+
+  RenderClipOval createRenderObject() => new RenderClipOval(clipper: clipper);
+
+  void updateRenderObject(RenderClipOval renderObject, ClipOval oldWidget) {
+    renderObject.clipper = clipper;
+  }
+
+  void didUnmountRenderObject(RenderClipOval renderObject) {
+    renderObject.clipper = null;
+  }
 }
 
 
@@ -277,8 +308,11 @@ class LayoutId extends ParentDataWidget {
   LayoutId({
     Key key,
     Widget child,
-    this.id
-  }) : super(key: key, child: child);
+    Object id
+  }) : id = id, super(key: key ?? new ValueKey(id), child: child) {
+    assert(child != null);
+    assert(id != null);
+  }
 
   final Object id;
 
@@ -1270,10 +1304,10 @@ class Listener extends OneChildRenderObjectWidget {
     assert(behavior != null);
   }
 
-  final PointerEventListener onPointerDown;
-  final PointerEventListener onPointerMove;
-  final PointerEventListener onPointerUp;
-  final PointerEventListener onPointerCancel;
+  final PointerDownEventListener onPointerDown;
+  final PointerMoveEventListener onPointerMove;
+  final PointerUpEventListener onPointerUp;
+  final PointerCancelEventListener onPointerCancel;
   final HitTestBehavior behavior;
 
   RenderPointerListener createRenderObject() => new RenderPointerListener(
@@ -1366,4 +1400,20 @@ class KeyedSubtree extends StatelessComponent {
   final Widget child;
 
   Widget build(BuildContext context) => child;
+}
+
+class Builder extends StatelessComponent {
+  Builder({ Key key, this.builder }) : super(key: key);
+  final WidgetBuilder builder;
+  Widget build(BuildContext context) => builder(context);
+}
+
+typedef Widget StatefulWidgetBuilder(BuildContext context, StateSetter setState);
+class StatefulBuilder extends StatefulComponent {
+  StatefulBuilder({ Key key, this.builder }) : super(key: key);
+  final StatefulWidgetBuilder builder;
+  _StatefulBuilderState createState() => new _StatefulBuilderState();
+}
+class _StatefulBuilderState extends State<StatefulBuilder> {
+  Widget build(BuildContext context) => config.builder(context, setState);
 }

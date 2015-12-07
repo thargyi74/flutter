@@ -771,6 +771,7 @@ class AndroidDevice extends Device {
   bool startBundle(AndroidApk apk, String bundlePath, {
     bool poke,
     bool checked,
+    bool traceStartup,
     String route
   }) {
     logging.fine('$this startBundle');
@@ -792,6 +793,8 @@ class AndroidDevice extends Device {
     ]);
     if (checked)
       cmd.addAll(['--ez', 'enable-checked-mode', 'true']);
+    if (traceStartup)
+        cmd.addAll(['--ez', 'trace-startup', 'true']);
     if (route != null)
       cmd.addAll(['--es', 'route', route]);
     cmd.add(apk.launchActivity);
@@ -850,8 +853,33 @@ class AndroidDevice extends Device {
     ]));
   }
 
-  String stopTracing(AndroidApk apk) {
-    clearLogs();
+  static String _threeDigits(int n) {
+    if (n >= 100) return "$n";
+    if (n >= 10) return "0$n";
+    return "00$n";
+  }
+
+  static String _twoDigits(int n) {
+    if (n >= 10) return "$n";
+    return "0$n";
+  }
+
+  static String _logcatDateFormat(DateTime dt) {
+    // Doing this manually, instead of using package:intl for simplicity.
+    // adb logcat -T wants "%m-%d %H:%M:%S.%3q"
+    String m = _twoDigits(dt.month);
+    String d = _twoDigits(dt.day);
+    String H = _twoDigits(dt.hour);
+    String M = _twoDigits(dt.minute);
+    String S = _twoDigits(dt.second);
+    String q = _threeDigits(dt.millisecond);
+    return "$m-$d $H:$M:$S.$q";
+  }
+
+  String stopTracing(AndroidApk apk, { String outPath: null }) {
+    // Workaround for logcat -c not always working:
+    // http://stackoverflow.com/questions/25645012/logcat-on-android-l-not-clearing-after-unplugging-and-reconnecting
+    String beforeStop = _logcatDateFormat(new DateTime.now());
     runCheckedSync(adbCommandForDevice([
       'shell',
       'am',
@@ -866,20 +894,21 @@ class AndroidDevice extends Device {
     String tracePath = null;
     bool isComplete = false;
     while (!isComplete) {
-      String logs = runSync(adbCommandForDevice(['logcat', '-d']));
+      String logs = runCheckedSync(adbCommandForDevice(['logcat', '-d', '-T', beforeStop]));
       Match fileMatch = traceRegExp.firstMatch(logs);
-      if (fileMatch[1] != null) {
+      if (fileMatch != null && fileMatch[1] != null) {
         tracePath = fileMatch[1];
       }
       isComplete = completeRegExp.hasMatch(logs);
     }
 
     if (tracePath != null) {
+      String localPath = (outPath != null) ? outPath : path.basename(tracePath);
       runCheckedSync(adbCommandForDevice(['root']));
       runSync(adbCommandForDevice(['shell', 'run-as', apk.id, 'chmod', '777', tracePath]));
-      runCheckedSync(adbCommandForDevice(['pull', tracePath]));
+      runCheckedSync(adbCommandForDevice(['pull', tracePath, localPath]));
       runSync(adbCommandForDevice(['shell', 'rm', tracePath]));
-      return path.basename(tracePath);
+      return localPath;
     }
     logging.warning('No trace file detected. '
         'Did you remember to start the trace before stopping it?');

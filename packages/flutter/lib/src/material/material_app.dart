@@ -10,7 +10,6 @@ import 'package:flutter/widgets.dart';
 
 import 'page.dart';
 import 'theme.dart';
-import 'title.dart';
 
 const TextStyle _errorTextStyle = const TextStyle(
   color: const Color(0xD0FF0000),
@@ -37,7 +36,6 @@ class RouteArguments {
   final BuildContext context;
 }
 typedef Widget RouteBuilder(RouteArguments args);
-typedef RouteBuilder RouteGenerator(String name);
 
 class MaterialApp extends StatefulComponent {
   MaterialApp({
@@ -54,7 +52,7 @@ class MaterialApp extends StatefulComponent {
   final String title;
   final ThemeData theme;
   final Map<String, RouteBuilder> routes;
-  final RouteGenerator onGenerateRoute;
+  final RouteFactory onGenerateRoute;
 
   _MaterialAppState createState() => new _MaterialAppState();
 }
@@ -93,26 +91,33 @@ class _MaterialAppState extends State<MaterialApp> implements BindingObserver {
   final HeroController _heroController = new HeroController();
 
   Route _generateRoute(NamedRouteSettings settings) {
-    return new MaterialPageRoute(
-      builder: (BuildContext context) {
-        RouteBuilder builder = config.routes[settings.name] ?? config.onGenerateRoute(settings.name);
-        return builder(new RouteArguments(context: context));
-      },
-      settings: settings
-    );
+    RouteBuilder builder = config.routes[settings.name];
+    if (builder != null) {
+      return new MaterialPageRoute(
+        builder: (BuildContext context) {
+          return builder(new RouteArguments(context: context));
+        },
+        settings: settings
+      );
+    }
+    if (config.onGenerateRoute != null)
+      return config.onGenerateRoute(settings);
+    return null;
   }
 
   Widget build(BuildContext context) {
+    ThemeData theme = config.theme ?? new ThemeData.fallback();
     return new MediaQuery(
       data: new MediaQueryData(size: _size),
       child: new Theme(
-        data: config.theme ?? new ThemeData.fallback(),
+        data: theme,
         child: new DefaultTextStyle(
           style: _errorTextStyle,
           child: new DefaultAssetBundle(
             bundle: _defaultBundle,
             child: new Title(
               title: config.title,
+              color: theme.primaryColor,
               child: new Navigator(
                 key: _navigator,
                 initialRoute: ui.window.defaultRouteName,

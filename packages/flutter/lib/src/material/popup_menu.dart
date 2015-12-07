@@ -9,15 +9,42 @@ import 'package:flutter/widgets.dart';
 
 import 'ink_well.dart';
 import 'material.dart';
-import 'popup_menu_item.dart';
+import 'theme.dart';
 
 const Duration _kMenuDuration = const Duration(milliseconds: 300);
+const double _kBaselineOffsetFromBottom = 20.0;
 const double _kMenuCloseIntervalEnd = 2.0 / 3.0;
-const double _kMenuWidthStep = 56.0;
-const double _kMenuMinWidth = 2.0 * _kMenuWidthStep;
-const double _kMenuMaxWidth = 5.0 * _kMenuWidthStep;
 const double _kMenuHorizontalPadding = 16.0;
+const double _kMenuItemHeight = 48.0;
+const double _kMenuMaxWidth = 5.0 * _kMenuWidthStep;
+const double _kMenuMinWidth = 2.0 * _kMenuWidthStep;
 const double _kMenuVerticalPadding = 8.0;
+const double _kMenuWidthStep = 56.0;
+
+class PopupMenuItem<T> extends StatelessComponent {
+  PopupMenuItem({
+    Key key,
+    this.value,
+    this.child
+  }) : super(key: key);
+
+  final Widget child;
+  final T value;
+
+  Widget build(BuildContext context) {
+    return new Container(
+      height: _kMenuItemHeight,
+      padding: const EdgeDims.symmetric(horizontal: _kMenuHorizontalPadding),
+      child: new DefaultTextStyle(
+        style: Theme.of(context).text.subhead,
+        child: new Baseline(
+          baseline: _kMenuItemHeight - _kBaselineOffsetFromBottom,
+          child: child
+        )
+      )
+    );
+  }
+}
 
 class _PopupMenu<T> extends StatelessComponent {
   _PopupMenu({
@@ -71,7 +98,6 @@ class _PopupMenu<T> extends StatelessComponent {
                   child: new Block(
                     children,
                     padding: const EdgeDims.symmetric(
-                      horizontal: _kMenuHorizontalPadding,
                       vertical: _kMenuVerticalPadding
                     )
                   )
@@ -97,19 +123,20 @@ class _PopupMenuRoute<T> extends PopupRoute<T> {
   final List<PopupMenuItem<T>> items;
   final int elevation;
 
-  Performance createPerformance() {
-    Performance result = super.createPerformance();
-    AnimationTiming timing = new AnimationTiming();
-    timing.reverseCurve = new Interval(0.0, _kMenuCloseIntervalEnd);
-    result.timing = timing;
-    return result;
+  PerformanceView createPerformance() {
+    return new CurvedPerformance(
+      super.createPerformance(),
+      reverseCurve: new Interval(0.0, _kMenuCloseIntervalEnd)
+     );
   }
 
   Duration get transitionDuration => _kMenuDuration;
   bool get barrierDismissable => true;
   Color get barrierColor => null;
 
-  Widget buildPage(BuildContext context) => new _PopupMenu(route: this);
+  Widget buildPage(BuildContext context, PerformanceView performance, PerformanceView forwardPerformance) {
+    return new _PopupMenu(route: this);
+  }
 }
 
 Future showMenu({ BuildContext context, ModalPosition position, List<PopupMenuItem> items, int elevation: 8 }) {

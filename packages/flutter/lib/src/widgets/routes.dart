@@ -13,7 +13,7 @@ import 'modal_barrier.dart';
 import 'navigator.dart';
 import 'overlay.dart';
 import 'page_storage.dart';
-import 'status_transitions.dart';
+import 'pages.dart';
 
 const _kTransparent = const Color(0x00000000);
 
@@ -81,13 +81,25 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
   Duration get transitionDuration;
   bool get opaque;
 
-  PerformanceView get performance => _performance?.view;
-  Performance _performance;
+  PerformanceView get performance => _performance;
+  Performance _performanceController;
+  PerformanceView _performance;
 
-  Performance createPerformance() {
+  /// Called to create the Performance object that will drive the transitions to
+  /// this route from the previous one, and back to the previous route from this
+  /// one.
+  Performance createPerformanceController() {
     Duration duration = transitionDuration;
     assert(duration != null && duration >= Duration.ZERO);
     return new Performance(duration: duration, debugLabel: debugLabel);
+  }
+
+  /// Called to create the PerformanceView that exposes the current progress of
+  /// the transition controlled by the Performance object created by
+  /// [createPerformanceController()].
+  PerformanceView createPerformance() {
+    assert(_performanceController != null);
+    return _performanceController.view;
   }
 
   T _result;
@@ -112,26 +124,29 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
   }
 
   void install(OverlayEntry insertionPoint) {
+    _performanceController = createPerformanceController();
+    assert(_performanceController != null);
     _performance = createPerformance();
+    assert(_performance != null);
     super.install(insertionPoint);
   }
 
   void didPush() {
     _performance.addStatusListener(handleStatusChanged);
-    _performance.forward();
+    _performanceController.forward();
     super.didPush();
   }
 
   void didReplace(Route oldRoute) {
     if (oldRoute is TransitionRoute)
-      _performance.progress = oldRoute._performance.progress;
+      _performanceController.progress = oldRoute._performanceController.progress;
     _performance.addStatusListener(handleStatusChanged);
     super.didReplace(oldRoute);
   }
 
   bool didPop(T result) {
     _result = result;
-    _performance.reverse();
+    _performanceController.reverse();
     _popCompleter?.complete(_result);
     return true;
   }
@@ -142,16 +157,17 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
   }
 
   void dispose() {
-    _performance.stop();
+    _performanceController.stop();
     super.dispose();
   }
 
 
-  final ProxyPerformance forwardPerformance = new ProxyPerformance();
+  PerformanceView get forwardPerformance => _forwardPerformance;
+  final ProxyPerformance _forwardPerformance = new ProxyPerformance();
 
   void didPushNext(Route nextRoute) {
-    if (nextRoute is TransitionRoute) {
-      PerformanceView current = forwardPerformance.masterPerformance;
+    if (nextRoute is TransitionRoute && canTransitionTo(nextRoute) && nextRoute.canTransitionFrom(this)) {
+      PerformanceView current = _forwardPerformance.masterPerformance;
       if (current != null) {
         if (current is TrainHoppingPerformance) {
           TrainHoppingPerformance newPerformance;
@@ -159,41 +175,29 @@ abstract class TransitionRoute<T> extends OverlayRoute<T> {
             current.currentTrain,
             nextRoute.performance,
             onSwitchedTrain: () {
-              assert(forwardPerformance.masterPerformance == newPerformance);
+              assert(_forwardPerformance.masterPerformance == newPerformance);
               assert(newPerformance.currentTrain == nextRoute.performance);
-              forwardPerformance.masterPerformance = newPerformance.currentTrain;
+              _forwardPerformance.masterPerformance = newPerformance.currentTrain;
               newPerformance.dispose();
             }
           );
-          forwardPerformance.masterPerformance = newPerformance;
+          _forwardPerformance.masterPerformance = newPerformance;
           current.dispose();
         } else {
-          forwardPerformance.masterPerformance = new TrainHoppingPerformance(current, nextRoute.performance);
+          _forwardPerformance.masterPerformance = new TrainHoppingPerformance(current, nextRoute.performance);
         }
       } else {
-        forwardPerformance.masterPerformance = nextRoute.performance;
+        _forwardPerformance.masterPerformance = nextRoute.performance;
       }
     }
     super.didPushNext(nextRoute);
   }
 
-  Widget wrapTransition(BuildContext context, Widget child) {
-    return buildForwardTransition(
-      context,
-      forwardPerformance,
-      buildTransition(
-        context,
-        performance,
-        child
-      )
-    );
-  }
-
-  Widget buildTransition(BuildContext context, PerformanceView performance, Widget child) => child;
-  Widget buildForwardTransition(BuildContext context, PerformanceView performance, Widget child) => child;
+  bool canTransitionTo(TransitionRoute nextRoute) => true;
+  bool canTransitionFrom(TransitionRoute nextRoute) => true;
 
   String get debugLabel => '$runtimeType';
-  String toString() => '$runtimeType(performance: $_performance)';
+  String toString() => '$runtimeType(performance: $_performanceController)';
 }
 
 class LocalHistoryEntry {
@@ -236,6 +240,9 @@ abstract class LocalHistoryRoute<T> extends Route<T> {
     }
     return super.didPop(result);
   }
+  bool get willHandlePopInternally {
+    return _localHistory != null && _localHistory.length > 0;
+  }
 }
 
 class _ModalScopeStatus extends InheritedWidget {
@@ -264,44 +271,85 @@ class _ModalScopeStatus extends InheritedWidget {
   }
 }
 
-class _ModalScope extends StatusTransitionComponent {
+class _ModalScope extends StatefulComponent {
   _ModalScope({
     Key key,
     this.subtreeKey,
     this.storageBucket,
-    PerformanceView performance,
+    this.performance,
+    this.forwardPerformance,
     this.current,
     this.route
-  }) : super(key: key, performance: performance);
+  }) : super(key: key);
 
   final GlobalKey subtreeKey;
   final PageStorageBucket storageBucket;
+  final PerformanceView performance;
+  final PerformanceView forwardPerformance;
   final bool current;
   final ModalRoute route;
 
+  _ModalScopeState createState() => new _ModalScopeState();
+}
+
+class _ModalScopeState extends State<_ModalScope> {
+  void initState() {
+    super.initState();
+    config.performance?.addStatusListener(_performanceStatusChanged);
+    config.forwardPerformance?.addStatusListener(_performanceStatusChanged);
+  }
+
+  void didUpdateConfig(_ModalScope oldConfig) {
+    if (config.performance != oldConfig.performance) {
+      oldConfig.performance?.removeStatusListener(_performanceStatusChanged);
+      config.performance?.addStatusListener(_performanceStatusChanged);
+    }
+    if (config.forwardPerformance != oldConfig.forwardPerformance) {
+      oldConfig.forwardPerformance?.removeStatusListener(_performanceStatusChanged);
+      config.forwardPerformance?.addStatusListener(_performanceStatusChanged);
+    }
+  }
+
+  void dispose() {
+    config.performance?.removeStatusListener(_performanceStatusChanged);
+    config.forwardPerformance?.removeStatusListener(_performanceStatusChanged);
+    super.dispose();
+  }
+
+  void _performanceStatusChanged(PerformanceStatus status) {
+    setState(() {
+      // The performances' states are our build state, and they changed already.
+    });
+  }
+
   Widget build(BuildContext context) {
     Widget contents = new PageStorage(
-      key: subtreeKey,
-      bucket: storageBucket,
+      key: config.subtreeKey,
+      bucket: config.storageBucket,
       child: new _ModalScopeStatus(
-        current: current,
-        route: route,
-        child: route.buildPage(context)
+        current: config.current,
+        route: config.route,
+        child: config.route.buildPage(context, config.performance, config.forwardPerformance)
       )
     );
-    if (route.offstage) {
+    if (config.route.offstage) {
       contents = new OffStage(child: contents);
     } else {
       contents = new Focus(
-        key: new GlobalObjectKey(route),
+        key: new GlobalObjectKey(config.route),
         child: new IgnorePointer(
-          ignoring: performance.status == PerformanceStatus.reverse,
-          child: route.wrapTransition(context, contents)
+          ignoring: config.performance?.status == PerformanceStatus.reverse,
+          child: config.route.buildTransitions(
+            context,
+            config.performance,
+            config.forwardPerformance,
+            contents
+          )
         )
       );
     }
     contents = new RepaintBoundary(child: contents);
-    ModalPosition position = route.position;
+    ModalPosition position = config.route.position;
     if (position == null)
       return contents;
     return new Positioned(
@@ -341,8 +389,8 @@ abstract class ModalRoute<T> extends TransitionRoute<T> with LocalHistoryRoute<T
   // The API for subclasses to override - used by _ModalScope
 
   ModalPosition get position => null;
-  Widget buildPage(BuildContext context);
-  Widget buildTransition(BuildContext context, PerformanceView performance, Widget child) {
+  Widget buildPage(BuildContext context, PerformanceView performance, PerformanceView forwardPerformance);
+  Widget buildTransitions(BuildContext context, PerformanceView performance, PerformanceView forwardPerformance, Widget child) {
     return child;
   }
 
@@ -379,7 +427,7 @@ abstract class ModalRoute<T> extends TransitionRoute<T> with LocalHistoryRoute<T
 
   // Internals
 
-  final GlobalKey<StatusTransitionState> _scopeKey = new GlobalKey<StatusTransitionState>();
+  final GlobalKey<_ModalScopeState> _scopeKey = new GlobalKey<_ModalScopeState>();
   final GlobalKey _subtreeKey = new GlobalKey();
   final PageStorageBucket _storageBucket = new PageStorageBucket();
 
@@ -402,9 +450,10 @@ abstract class ModalRoute<T> extends TransitionRoute<T> with LocalHistoryRoute<T
       subtreeKey: _subtreeKey,
       storageBucket: _storageBucket,
       performance: performance,
+      forwardPerformance: forwardPerformance,
       current: isCurrent,
       route: this
-      // calls buildTransition()/buildForwardTransition() and buildPage(), defined above
+      // calls buildTransitions() and buildPage(), defined above
     );
   }
 
@@ -424,13 +473,4 @@ abstract class PopupRoute<T> extends ModalRoute<T> {
     assert(nextRoute is! PageRoute);
     super.didPushNext(nextRoute);
   }
-}
-
-/// A modal route that replaces the entire screen.
-abstract class PageRoute<T> extends ModalRoute<T> {
-  PageRoute({
-    Completer<T> completer,
-    NamedRouteSettings settings: const NamedRouteSettings()
-  }) : super(completer: completer, settings: settings);
-  bool get opaque => true;
 }

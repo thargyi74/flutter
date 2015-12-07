@@ -139,7 +139,7 @@ abstract class RenderDecoratedSector extends RenderSector {
       return;
 
     if (_decoration.backgroundColor != null) {
-      final PaintingCanvas canvas = context.canvas;
+      final Canvas canvas = context.canvas;
       Paint paint = new Paint()..color = _decoration.backgroundColor;
       Path path = new Path();
       double outerRadius = (parentData.radius + deltaRadius);
@@ -518,10 +518,11 @@ class RenderSolidColor extends RenderDecoratedSector {
     deltaTheta = constraints.constrainDeltaTheta(desiredDeltaTheta);
   }
 
-  void handleEvent(InputEvent event, HitTestEntry entry) {
-    if (event.type == 'pointerdown')
+  void handleEvent(PointerEvent event, HitTestEntry entry) {
+    if (event is PointerDownEvent) {
       decoration = new BoxDecoration(backgroundColor: const Color(0xFFFF0000));
-    else if (event.type == 'pointerup')
+    } else if (event is PointerUpEvent) {
       decoration = new BoxDecoration(backgroundColor: backgroundColor);
+    }
   }
 }

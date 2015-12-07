@@ -164,8 +164,8 @@ class _RenderSwitch extends RenderToggleable {
     reaction.reverse();
   }
 
-  void handleEvent(InputEvent event, BoxHitTestEntry entry) {
-    if (event.type == 'pointerdown' && onChanged != null)
+  void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
+    if (event is PointerDownEvent && onChanged != null)
       _drag.addPointer(event);
     super.handleEvent(event, entry);
   }
@@ -173,7 +173,7 @@ class _RenderSwitch extends RenderToggleable {
   final BoxPainter _thumbPainter = new BoxPainter(const BoxDecoration());
 
   void paint(PaintingContext context, Offset offset) {
-    final PaintingCanvas canvas = context.canvas;
+    final Canvas canvas = context.canvas;
 
     final bool isActive = onChanged != null;
 

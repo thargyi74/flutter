@@ -145,22 +145,9 @@ class StockHomeState extends State<StockHome> {
   }
 
   Widget buildToolBar() {
-    PageRoute page = ModalRoute.of(context);
     return new ToolBar(
       elevation: 0,
-      left: new IconButton(
-        icon: "navigation/menu",
-        onPressed: () => _scaffoldKey.currentState?.openDrawer()
-      ),
-      center: new FadeTransition(
-        opacity: new AnimatedValue<double>(
-          1.0,
-          end: 0.0,
-          curve: const Interval(0.0, 0.5)
-        ),
-        performance: page.forwardPerformance,
-        child: new Text('Stocks')
-      ),
+      center: new Text(StockStrings.title()),
       right: <Widget>[
         new IconButton(
           icon: "action/search",
@@ -174,8 +161,8 @@ class StockHomeState extends State<StockHome> {
       tabBar: new TabBar(
         selection: _tabBarSelection,
         labels: <TabLabel>[
-          const TabLabel(text: 'MARKET'),
-          const TabLabel(text: 'PORTFOLIO')]
+          new TabLabel(text: StockStrings.market()),
+          new TabLabel(text: StockStrings.portfolio())]
       )
     );
   }
@@ -239,7 +226,7 @@ class StockHomeState extends State<StockHome> {
   Widget buildSearchBar() {
     return new ToolBar(
       left: new IconButton(
-        icon: "navigation/arrow_back",
+        icon: 'navigation/arrow_back',
         colorFilter: new ColorFilter.mode(Theme.of(context).accentColor, ui.TransferMode.srcATop),
         onPressed: _handleSearchEnd
       ),

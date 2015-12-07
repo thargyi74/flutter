@@ -14,7 +14,12 @@ import 'debug.dart';
 import 'object.dart';
 
 export 'package:flutter/src/painting/box_painter.dart';
-export 'package:flutter/gestures.dart' show InputEvent, PointerInputEvent;
+export 'package:flutter/gestures.dart' show
+  PointerEvent,
+  PointerDownEvent,
+  PointerMoveEvent,
+  PointerUpEvent,
+  PointerCancelEvent;
 
 /// A base class for render objects that resemble their children
 ///
@@ -561,15 +566,61 @@ class RenderShaderMask extends RenderProxyBox {
   }
 }
 
+abstract class CustomClipper<T> {
+  T getClip(Size size);
+  bool shouldRepaint(CustomClipper oldClipper);
+}
+
+abstract class _RenderCustomClip<T> extends RenderProxyBox {
+  _RenderCustomClip({
+    RenderBox child,
+    CustomClipper<T> clipper
+  }) : _clipper = clipper, super(child);
+
+  CustomClipper<T> get clipper => _clipper;
+  CustomClipper<T> _clipper;
+  void set clipper (CustomClipper<T> newClipper) {
+    if (_clipper == newClipper)
+      return;
+    CustomClipper<T> oldClipper = _clipper;
+    _clipper = newClipper;
+    if (newClipper == null) {
+      assert(oldClipper != null);
+      markNeedsPaint();
+    } else if (oldClipper == null ||
+        oldClipper.runtimeType != oldClipper.runtimeType ||
+        newClipper.shouldRepaint(oldClipper)) {
+      markNeedsPaint();
+    }
+  }
+
+  T get _defaultClip;
+  T get _clip => _clipper?.getClip(size) ?? _defaultClip;
+}
+
 /// Clips its child using a rectangle
 ///
 /// Prevents its child from painting outside its bounds.
-class RenderClipRect extends RenderProxyBox {
-  RenderClipRect({ RenderBox child }) : super(child);
+class RenderClipRect extends _RenderCustomClip<Rect> {
+  RenderClipRect({
+    RenderBox child,
+    CustomClipper<Rect> clipper
+  }) : super(child: child, clipper: clipper);
+
+  Rect get _defaultClip => Point.origin & size;
+
+  bool hitTest(HitTestResult result, { Point position }) {
+    if (_clipper != null) {
+      Rect clipRect = _clip;
+      if (!clipRect.contains(position))
+        return false;
+    }
+    return super.hitTest(result, position: position);
+  }
 
   void paint(PaintingContext context, Offset offset) {
     if (child != null)
-      context.pushClipRect(needsCompositing, offset, Point.origin & size, super.paint);
+      context.pushClipRect(needsCompositing, offset, _clip, super.paint);
   }
 }
 
@@ -579,8 +630,11 @@ class RenderClipRect extends RenderProxyBox {
 /// y radius values and prevents its child from painting outside that rounded
 /// rectangle.
 class RenderClipRRect extends RenderProxyBox {
-  RenderClipRRect({ RenderBox child, double xRadius, double yRadius })
-    : _xRadius = xRadius, _yRadius = yRadius, super(child) {
+  RenderClipRRect({
+    RenderBox child,
+    double xRadius,
+    double yRadius
+  }) : _xRadius = xRadius, _yRadius = yRadius, super(child) {
     assert(_xRadius != null);
     assert(_yRadius != null);
   }
@@ -626,8 +680,11 @@ class RenderClipRRect extends RenderProxyBox {
 ///
 /// Inscribes an oval into its layout dimensions and prevents its child from
 /// painting outside that oval.
-class RenderClipOval extends RenderProxyBox {
-  RenderClipOval({ RenderBox child }) : super(child);
+class RenderClipOval extends _RenderCustomClip<Rect> {
+  RenderClipOval({
+    RenderBox child,
+    CustomClipper<Rect> clipper
+  }) : super(child: child, clipper: clipper);
 
   Rect _cachedRect;
   Path _cachedPath;
@@ -640,10 +697,13 @@ class RenderClipOval extends RenderProxyBox {
     return _cachedPath;
   }
 
+  Rect get _defaultClip => Point.origin & size;
+
   bool hitTest(HitTestResult result, { Point position }) {
-    Point center = size.center(Point.origin);
-    Offset offset = new Offset((position.x - center.x) / size.width,
-                               (position.y - center.y) / size.height);
+    Rect clipBounds = _clip;
+    Point center = clipBounds.center;
+    Offset offset = new Offset((position.x - center.x) / clipBounds.width,
+                               (position.y - center.y) / clipBounds.height);
     if (offset.distance > 0.5)
       return false;
     return super.hitTest(result, position: position);
@@ -651,8 +711,8 @@ class RenderClipOval extends RenderProxyBox {
 
   void paint(PaintingContext context, Offset offset) {
     if (child != null) {
-      Rect bounds = Point.origin & size;
-      context.pushClipPath(needsCompositing, offset, bounds, _getClipPath(bounds), super.paint);
+      Rect clipBounds = _clip;
+      context.pushClipPath(needsCompositing, offset, clipBounds, _getClipPath(clipBounds), super.paint);
     }
   }
 }
@@ -936,67 +996,91 @@ class RenderSizeObserver extends RenderProxyBox {
 abstract class CustomPainter {
   const CustomPainter();
 
-  void paint(PaintingCanvas canvas, Size size);
+  void paint(Canvas canvas, Size size);
   bool shouldRepaint(CustomPainter oldDelegate);
-  bool hitTest(Point position) => true;
+  bool hitTest(Point position) => null;
 }
 
-/// Delegates its painting to [onPaint]
+/// Delegates its painting
 ///
-/// When asked to paint, custom paint first calls its callback with the current
-/// canvas and then paints its children. The coodinate system of the canvas
-/// matches the coordinate system of the custom paint object. The callback is
-/// expected to paint with in a rectangle starting at the origin and
-/// encompassing a region of the given size. If the callback paints outside
+/// When asked to paint, custom paint first asks painter to paint with the
+/// current canvas and then paints its children. After painting its children,
+/// custom paint asks foregroundPainter to paint. The coodinate system of the
+/// canvas matches the coordinate system of the custom paint object. The
+/// painters are expected to paint with in a rectangle starting at the origin
+/// and encompassing a region of the given size. If the painters paints outside
 /// those bounds, there might be insufficient memory allocated to rasterize the
 /// painting commands and the resulting behavior is undefined.
 ///
-/// Note: Custom paint calls its callback during paint, which means you cannot
+/// Note: Custom paint calls its painters during paint, which means you cannot
 /// dirty layout or paint information during the callback.
 class RenderCustomPaint extends RenderProxyBox {
-
   RenderCustomPaint({
     CustomPainter painter,
+    CustomPainter foregroundPainter,
     RenderBox child
-  }) : _painter = painter, super(child) {
-    assert(painter != null);
-  }
+  }) : _painter = painter, _foregroundPainter = foregroundPainter, super(child);
 
   CustomPainter get painter => _painter;
   CustomPainter _painter;
   void set painter (CustomPainter newPainter) {
-    assert(newPainter != null || !attached);
     if (_painter == newPainter)
       return;
     CustomPainter oldPainter = _painter;
     _painter = newPainter;
-    if (newPainter == null)
-      return;
-    if (oldPainter == null
-        || newPainter.runtimeType != oldPainter.runtimeType
-        || newPainter.shouldRepaint(oldPainter))
-      markNeedsPaint();
+    _checkForRepaint(_painter, oldPainter);
   }
 
-  void attach() {
-    assert(_painter != null);
-    super.attach();
+  CustomPainter get foregroundPainter => _foregroundPainter;
+  CustomPainter _foregroundPainter;
+  void set foregroundPainter (CustomPainter newPainter) {
+    if (_foregroundPainter == newPainter)
+      return;
+    CustomPainter oldPainter = _foregroundPainter;
+    _foregroundPainter = newPainter;
+    _checkForRepaint(_foregroundPainter, oldPainter);
+  }
+
+  void _checkForRepaint(CustomPainter newPainter, CustomPainter oldPainter) {
+    if (newPainter == null) {
+      assert(oldPainter != null); // We should be called only for changes.
+      markNeedsPaint();
+    } else if (oldPainter == null ||
+        newPainter.runtimeType != oldPainter.runtimeType ||
+        newPainter.shouldRepaint(oldPainter)) {
+      markNeedsPaint();
+    }
+  }
+
+  bool hitTestChildren(HitTestResult result, { Point position }) {
+    if (_foregroundPainter != null && (_foregroundPainter.hitTest(position) ?? false))
+      return true;
+    return super.hitTestChildren(result, position: position);
   }
 
   bool hitTestSelf(Point position) {
-    return _painter.hitTest(position);
+    return _painter != null && (_painter.hitTest(position) ?? true);
+  }
+
+  void _paintWithPainter(Canvas canvas, Offset offset, CustomPainter painter) {
+    canvas.translate(offset.dx, offset.dy);
+    painter.paint(canvas, size);
+    canvas.translate(-offset.dx, -offset.dy);
   }
 
   void paint(PaintingContext context, Offset offset) {
-    assert(_painter != null);
-    context.canvas.translate(offset.dx, offset.dy);
-    _painter.paint(context.canvas, size);
-    context.canvas.translate(-offset.dx, -offset.dy);
+    if (_painter != null)
+      _paintWithPainter(context.canvas, offset, _painter);
     super.paint(context, offset);
+    if (_foregroundPainter != null)
+      _paintWithPainter(context.canvas, offset, _foregroundPainter);
   }
 }
 
-typedef void PointerEventListener(PointerInputEvent event);
+typedef void PointerDownEventListener(PointerDownEvent event);
+typedef void PointerMoveEventListener(PointerMoveEvent event);
+typedef void PointerUpEventListener(PointerUpEvent event);
+typedef void PointerCancelEventListener(PointerCancelEvent event);
 
 enum HitTestBehavior {
   deferToChild,
@@ -1015,10 +1099,10 @@ class RenderPointerListener extends RenderProxyBox {
     RenderBox child
   }) : super(child);
 
-  PointerEventListener onPointerDown;
-  PointerEventListener onPointerMove;
-  PointerEventListener onPointerUp;
-  PointerEventListener onPointerCancel;
+  PointerDownEventListener onPointerDown;
+  PointerMoveEventListener onPointerMove;
+  PointerUpEventListener onPointerUp;
+  PointerCancelEventListener onPointerCancel;
   HitTestBehavior behavior;
 
   bool hitTest(HitTestResult result, { Point position }) {
@@ -1034,14 +1118,14 @@ class RenderPointerListener extends RenderProxyBox {
 
   bool hitTestSelf(Point position) => behavior == HitTestBehavior.opaque;
 
-  void handleEvent(InputEvent event, HitTestEntry entry) {
-    if (onPointerDown != null && event.type == 'pointerdown')
+  void handleEvent(PointerEvent event, HitTestEntry entry) {
+    if (onPointerDown != null && event is PointerDownEvent)
       return onPointerDown(event);
-    if (onPointerMove != null && event.type == 'pointermove')
+    if (onPointerMove != null && event == PointerMoveEvent)
       return onPointerMove(event);
-    if (onPointerUp != null && event.type == 'pointerup')
+    if (onPointerUp != null && event == PointerUpEvent)
       return onPointerUp(event);
-    if (onPointerCancel != null && event.type == 'pointercancel')
+    if (onPointerCancel != null && event == PointerCancelEvent)
       return onPointerCancel(event);
   }
 
