@@ -101,7 +101,7 @@ class _PointerEventConverter {
           // start sending us ADDED and REMOVED data points. In the meantime, we
           // only support "down" moves, and ignore spurious moves.
           // See also: https://github.com/flutter/flutter/issues/720
-          if (state != null)
+          if (state == null)
             break;
           assert(state.down);
           Offset offset = position - state.lastPosition;
@@ -197,6 +197,7 @@ class _PointerEventConverter {
 class BindingObserver {
   bool didPopRoute() => false;
   void didChangeSize(Size size) { }
+  void didChangeLocale(ui.Locale locale) { }
 }
 
 /// The glue between the render tree and the Flutter engine
@@ -208,6 +209,7 @@ class FlutterBinding extends HitTestTarget {
 
     ui.window.onPointerPacket = _handlePointerPacket;
     ui.window.onMetricsChanged = _handleMetricsChanged;
+    ui.window.onLocaleChanged = _handleLocaleChanged;
     ui.window.onPopRoute = _handlePopRoute;
 
     if (renderViewOverride == null) {
@@ -242,6 +244,11 @@ class FlutterBinding extends HitTestTarget {
     _renderView.rootConstraints = new ViewConstraints(size: size);
     for (BindingObserver observer in _observers)
       observer.didChangeSize(size);
+  }
+
+  void _handleLocaleChanged() {
+    for (BindingObserver observer in _observers)
+      observer.didChangeLocale(ui.window.locale);
   }
 
   void _handlePersistentFrameCallback(Duration timeStamp) {

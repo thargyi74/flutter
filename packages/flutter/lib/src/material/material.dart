@@ -25,7 +25,10 @@ enum MaterialType {
   circle,
 
   /// Rounded edges, no color by default (used for MaterialButton buttons).
-  button
+  button,
+
+  /// A transparent piece of material that draws ink splashes and highlights.
+  transparency
 }
 
 const Map<MaterialType, double> kMaterialEdges = const <MaterialType, double>{
@@ -33,6 +36,7 @@ const Map<MaterialType, double> kMaterialEdges = const <MaterialType, double>{
   MaterialType.card: 2.0,
   MaterialType.circle: null,
   MaterialType.button: 2.0,
+  MaterialType.transparency: null,
 };
 
 abstract class InkSplash {
@@ -61,7 +65,7 @@ abstract class MaterialInkController {
   InkSplash splashAt({ RenderBox referenceBox, Point position, Color color, bool containedInWell, VoidCallback onRemoved });
 
   /// Begin a highlight, coincident with the referenceBox.
-  InkHighlight highlightAt({ RenderBox referenceBox, Color color, Shape shape: Shape.rectangle, VoidCallback onRemoved });
+  InkHighlight highlightAt({ RenderBox referenceBox, Color color, BoxShape shape: BoxShape.rectangle, VoidCallback onRemoved });
 
   /// Add an arbitrary InkFeature to this InkController.
   void addInkFeature(InkFeature feature);
@@ -141,17 +145,19 @@ class _MaterialState extends State<Material> {
         child: contents
       );
     }
-    contents = new AnimatedContainer(
-      curve: Curves.ease,
-      duration: kThemeChangeDuration,
-      decoration: new BoxDecoration(
-        backgroundColor: backgroundColor,
-        borderRadius: kMaterialEdges[config.type],
-        boxShadow: config.elevation == 0 ? null : elevationToShadow[config.elevation],
-        shape: config.type == MaterialType.circle ? Shape.circle : Shape.rectangle
-      ),
-      child: contents
-    );
+    if (config.type != MaterialType.transparency) {
+      contents = new AnimatedContainer(
+        curve: Curves.ease,
+        duration: kThemeChangeDuration,
+        decoration: new BoxDecoration(
+          backgroundColor: backgroundColor,
+          borderRadius: kMaterialEdges[config.type],
+          boxShadow: config.elevation == 0 ? null : elevationToShadow[config.elevation],
+          shape: config.type == MaterialType.circle ? BoxShape.circle : BoxShape.rectangle
+        ),
+        child: contents
+      );
+    }
     return contents;
   }
 }
@@ -211,7 +217,7 @@ class RenderInkFeatures extends RenderProxyBox implements MaterialInkController 
   InkHighlight highlightAt({
     RenderBox referenceBox,
     Color color,
-    Shape shape: Shape.rectangle,
+    BoxShape shape: BoxShape.rectangle,
     VoidCallback onRemoved
   }) {
     _InkHighlight highlight = new _InkHighlight(
@@ -417,7 +423,7 @@ class _InkHighlight extends InkFeature implements InkHighlight {
     renderer.markNeedsPaint();
   }
 
-  final Shape shape;
+  final BoxShape shape;
 
   bool get active => _active;
   bool _active = true;
@@ -446,7 +452,7 @@ class _InkHighlight extends InkFeature implements InkHighlight {
   }
 
   void _paintHighlight(Canvas canvas, Rect rect, paint) {
-    if (shape == Shape.rectangle)
+    if (shape == BoxShape.rectangle)
       canvas.drawRect(rect, paint);
     else
       canvas.drawCircle(rect.center, _kDefaultSplashRadius, paint);
