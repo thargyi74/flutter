@@ -1,0 +1,5 @@
+name: gcm
+description: A minimal Flutter project.
+dependencies:
+  flutter:
+    path: ../flutter
