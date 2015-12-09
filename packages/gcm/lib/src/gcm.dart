@@ -16,5 +16,7 @@ GcmServiceProxy _initGcmService() {
 final GcmServiceProxy _gcmService = _initGcmService();
 
 void registerGcmService(String senderId) {
-  _gcm.ptr.register(senderId, null, (String x) { });
+  GcmListenerStub listener = new GcmListenerStub.unbound();
+   // ..impl = new GcmListenerDerived() (see RawKeyboardListener)
+  _gcmService.ptr.register(senderId, listener, (String x) { });
 }
