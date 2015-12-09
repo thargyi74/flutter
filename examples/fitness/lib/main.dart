@@ -7,6 +7,7 @@ library fitness;
 import 'package:playfair/playfair.dart' as playfair;
 import 'package:flutter/material.dart';
 import 'package:flutter/painting.dart';
+import 'package:gcm/gcm.dart' as gcm;
 
 import 'user_data.dart';
 import 'date_utils.dart';
@@ -162,5 +163,6 @@ class FitnessAppState extends State<FitnessApp> {
 }
 
 void main() {
+  gcm.registerGcmService("858790231562");
   runApp(new FitnessApp());
 }
