@@ -163,6 +163,8 @@ class FitnessAppState extends State<FitnessApp> {
 }
 
 void main() {
+  // Register for GCM messages using the senderId provided in the
+  // google-services.json we received when registering our app.
   gcm.registerGcmService("858790231562");
   runApp(new FitnessApp());
 }
