@@ -18,6 +18,7 @@ typedef void DragTargetAccept<T>(T data);
 typedef Widget DragTargetBuilder<T>(BuildContext context, List<T> candidateData, List<dynamic> rejectedData);
 typedef void DragStartCallback(Point position, int pointer);
 
+/// Where the [Draggable] should be anchored during a drag.
 enum DragAnchor {
   /// Display the feedback anchored at the position of the original child. If
   /// feedback is identical to the child, then this means the feedback will
@@ -37,6 +38,7 @@ enum DragAnchor {
   pointer,
 }
 
+/// Subclass this component to customize the gesture used to start a drag.
 abstract class DraggableBase<T> extends StatefulComponent {
   DraggableBase({
     Key key,
@@ -52,12 +54,16 @@ abstract class DraggableBase<T> extends StatefulComponent {
 
   final T data;
   final Widget child;
+
+  /// The widget to show when a drag is under way.
   final Widget feedback;
 
   /// The feedbackOffset can be used to set the hit test target point for the
   /// purposes of finding a drag target. It is especially useful if the feedback
   /// is transformed compared to the child.
   final Offset feedbackOffset;
+
+  /// Where this widget should be anchored during a drag.
   final DragAnchor dragAnchor;
 
   /// Should return a GestureRecognizer instance that is configured to call the starter
@@ -69,6 +75,7 @@ abstract class DraggableBase<T> extends StatefulComponent {
   _DraggableState<T> createState() => new _DraggableState<T>();
 }
 
+/// Makes its child draggable starting from tap down.
 class Draggable<T> extends DraggableBase<T> {
   Draggable({
     Key key,
@@ -89,11 +96,13 @@ class Draggable<T> extends DraggableBase<T> {
   GestureRecognizer createRecognizer(PointerRouter router, DragStartCallback starter) {
     return new MultiTapGestureRecognizer(
       router: router,
+      gestureArena: Gesturer.instance.gestureArena,
       onTapDown: starter
     );
   }
 }
 
+/// Makes its child draggable starting from long press.
 class LongPressDraggable<T> extends DraggableBase<T> {
   LongPressDraggable({
     Key key,
@@ -114,6 +123,7 @@ class LongPressDraggable<T> extends DraggableBase<T> {
   GestureRecognizer createRecognizer(PointerRouter router, DragStartCallback starter) {
     return new MultiTapGestureRecognizer(
       router: router,
+      gestureArena: Gesturer.instance.gestureArena,
       longTapDelay: kLongPressTimeout,
       onLongTapDown: (Point position, int pointer) {
         userFeedback.performHapticFeedback(HapticFeedbackType.VIRTUAL_KEY);
@@ -125,7 +135,7 @@ class LongPressDraggable<T> extends DraggableBase<T> {
 
 class _DraggableState<T> extends State<DraggableBase<T>> implements GestureArenaMember {
 
-  PointerRouter get router => FlutterBinding.instance.pointerRouter;
+  PointerRouter get router => Gesturer.instance.pointerRouter;
 
   void initState() {
     super.initState();
@@ -136,7 +146,7 @@ class _DraggableState<T> extends State<DraggableBase<T>> implements GestureArena
   Map<int, GestureArenaEntry> _activePointers = <int, GestureArenaEntry>{};
 
   void _routePointer(PointerEvent event) {
-    _activePointers[event.pointer] = GestureArena.instance.add(event.pointer, this);
+    _activePointers[event.pointer] = Gesturer.instance.gestureArena.add(event.pointer, this);
     _recognizer.addPointer(event);
   }
 
@@ -181,7 +191,7 @@ class _DraggableState<T> extends State<DraggableBase<T>> implements GestureArena
   }
 }
 
-
+/// Receives data when a [Draggable] widget is dropped.
 class DragTarget<T> extends StatefulComponent {
   const DragTarget({
     Key key,
@@ -190,14 +200,23 @@ class DragTarget<T> extends StatefulComponent {
     this.onAccept
   }) : super(key: key);
 
+  /// Called to build the contents of this widget.
+  ///
+  /// The builder can build different widgets depending on what is being dragged
+  /// into this drag target.
   final DragTargetBuilder<T> builder;
+
+  /// Called to determine whether this widget is interested in receiving a given
+  /// piece of data being dragged over this drag target.
   final DragTargetWillAccept<T> onWillAccept;
+
+  /// Called when an acceptable piece of data was dropped over this drag target.
   final DragTargetAccept<T> onAccept;
 
-  DragTargetState<T> createState() => new DragTargetState<T>();
+  _DragTargetState<T> createState() => new _DragTargetState<T>();
 }
 
-class DragTargetState<T> extends State<DragTarget<T>> {
+class _DragTargetState<T> extends State<DragTarget<T>> {
   final List<T> _candidateData = new List<T>();
   final List<dynamic> _rejectedData = new List<dynamic>();
 
@@ -279,7 +298,7 @@ class _DragAvatar<T> {
   final Widget feedback;
   final Offset feedbackOffset;
 
-  DragTargetState _activeTarget;
+  _DragTargetState _activeTarget;
   bool _activeTargetWillAcceptDrop = false;
   Offset _lastOffset;
   OverlayEntry _entry;
@@ -298,8 +317,9 @@ class _DragAvatar<T> {
   void update(Point globalPosition) {
     _lastOffset = globalPosition - dragStartPoint;
     _entry.markNeedsBuild();
-    HitTestResult result = WidgetFlutterBinding.instance.hitTest(globalPosition + feedbackOffset);
-    DragTargetState target = _getDragTarget(result.path);
+    HitTestResult result = new HitTestResult();
+    WidgetFlutterBinding.instance.hitTest(result, globalPosition + feedbackOffset);
+    _DragTargetState target = _getDragTarget(result.path);
     if (target == _activeTarget)
       return;
     if (_activeTarget != null)
@@ -308,13 +328,13 @@ class _DragAvatar<T> {
     _activeTargetWillAcceptDrop = _activeTarget != null && _activeTarget.didEnter(data);
   }
 
-  DragTargetState _getDragTarget(List<HitTestEntry> path) {
+  _DragTargetState _getDragTarget(List<HitTestEntry> path) {
     // Look for the RenderBox that corresponds to the hit target (the hit target
     // widget builds a RenderMetadata box for us for this purpose).
     for (HitTestEntry entry in path) {
       if (entry.target is RenderMetaData) {
         RenderMetaData renderMetaData = entry.target;
-        if (renderMetaData.metaData is DragTargetState)
+        if (renderMetaData.metaData is _DragTargetState)
           return renderMetaData.metaData;
       }
     }

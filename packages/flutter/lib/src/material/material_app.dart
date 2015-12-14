@@ -18,7 +18,7 @@ const TextStyle _errorTextStyle = const TextStyle(
   fontSize: 48.0,
   fontWeight: FontWeight.w900,
   textAlign: TextAlign.right,
-  decoration: underline,
+  decoration: TextDecoration.underline,
   decorationColor: const Color(0xFFFF00),
   decorationStyle: TextDecorationStyle.double
 );
@@ -74,11 +74,11 @@ class _MaterialAppState extends State<MaterialApp> implements BindingObserver {
     _navigator = new GlobalObjectKey(this);
     _size = ui.window.size;
     didChangeLocale(ui.window.locale);
-    FlutterBinding.instance.addObserver(this);
+    WidgetFlutterBinding.instance.addObserver(this);
   }
 
   void dispose() {
-    FlutterBinding.instance.removeObserver(this);
+    WidgetFlutterBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -106,7 +106,7 @@ class _MaterialAppState extends State<MaterialApp> implements BindingObserver {
 
   final HeroController _heroController = new HeroController();
 
-  Route _generateRoute(NamedRouteSettings settings) {
+  Route _generateRoute(RouteSettings settings) {
     RouteBuilder builder = config.routes[settings.name];
     if (builder != null) {
       return new MaterialPageRoute(

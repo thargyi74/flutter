@@ -5,6 +5,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'colors.dart';
+import 'debug.dart';
 import 'ink_well.dart';
 import 'material.dart';
 import 'theme.dart';
@@ -22,6 +23,9 @@ class ButtonTheme extends InheritedWidget {
 
   final ButtonColor color;
 
+  /// The color from the closest instance of this class that encloses the given context.
+  ///
+  /// Defaults to [ButtonColor.normal] if none exists.
   static ButtonColor of(BuildContext context) {
     ButtonTheme result = context.inheritFromWidgetOfType(ButtonTheme);
     return result?.color ?? ButtonColor.normal;
@@ -98,6 +102,7 @@ abstract class MaterialButtonState<T extends MaterialButton> extends State<T> {
   }
 
   Widget build(BuildContext context) {
+    assert(debugCheckHasMaterial(context));
     Widget contents = new InkWell(
       onTap: config.onPressed,
       onHighlightChanged: _handleHighlightChanged,

@@ -29,7 +29,7 @@ abstract class RenderToggleable extends RenderConstrainedBox {
     assert(value != null);
     assert(activeColor != null);
     assert(inactiveColor != null);
-    _tap = new TapGestureRecognizer(router: FlutterBinding.instance.pointerRouter)
+    _tap = new TapGestureRecognizer(router: Gesturer.instance.pointerRouter, gestureArena: Gesturer.instance.gestureArena)
       ..onTapDown = _handleTapDown
       ..onTap = _handleTap
       ..onTapUp = _handleTapUp

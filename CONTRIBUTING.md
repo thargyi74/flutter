@@ -76,29 +76,25 @@ own code by mimicking the `pubspec.yaml` files in the `examples` subdirectories.
 Running the tests
 -----------------
 
-Each package in the packages directory has its own suite of tests based on the
-`test` package. To run the tests for a given package, for example, the `newton`
-package, use the following commands:
+To automatically find all files named `_test.dart` inside a package and run them inside the flutter shell as a test use the `flutter test` command, e.g:
+
+ * `cd examples/stocks`
+ * `flutter test`
+
+Individual tests can also be run directly, e.g. `flutter test lib/my_app_test.dart`
+
+Flutter tests use [package:flutter_test](https://github.com/flutter/flutter/tree/master/packages/flutter_test) which provides flutter-specific extensions on top of [package:test](https://pub.dartlang.org/packages/test).
+
+`flutter test` runs tests inside the flutter shell.  Some packages inside the flutter repository can be run inside the dart command line VM as well as the flutter shell, `packages/newton` and `packages/flutter_tools` are two such examples:
 
  * `cd packages/newton`
  * `pub run test`
 
-Testing the `flutter` package is currently a bit harder because we don't yet
-support testing the `flutter` package with pre-built binaries. To test the
-package, you'll need to follow the [instructions below](#working-on-the-engine-and-the-framework-at-the-same-time)
-for working with this repository and the Flutter engine repository
-simultaneously and then run the following command (assuming the `flutter/bin`
-directory is in your path):
+`flutter test --flutter-repo` is a shortcut for those working on the flutter repository itself which finds and runs all tests inside the flutter repository regardless of the current working directory.
 
- * `flutter test --debug`
+If you've built [your own flutter engine](#working-on-the-engine-and-the-framework-at-the-same-time), you can pass `--debug` or `--release` to change what flutter shell `flutter test` uses.
 
-Creating a workflow for running the test with a prebuilt binary is
-[Issue #56](https://github.com/flutter/flutter/issues/56). If you want
-to run a single test individually:
-
- * `flutter test --debug trivial_test.dart`
-
-Note: The tests are headless, you won't see any UI. You can use
+Note: Flutter tests are headless, you won't see any UI. You can use
 `print` to generate console output or you can interact with the DartVM
 via observatory at [http://localhost:8181/](http://localhost:8181/).
 

@@ -11,12 +11,11 @@ import 'package:flutter/scheduler.dart';
 import 'package:vector_math/vector_math_64.dart';
 
 import 'debug.dart';
-import 'hit_test.dart';
 import 'layer.dart';
 import 'node.dart';
 
 export 'layer.dart';
-export 'hit_test.dart';
+export 'package:flutter/gestures.dart' show HitTestEntry, HitTestResult;
 
 typedef ui.Shader ShaderCallback(Rect bounds);
 
@@ -366,6 +365,9 @@ abstract class Constraints {
 
   /// Whether there is exactly one size possible given these constraints
   bool get isTight;
+
+  /// Whether the constraint is expressed in a consistent manner.
+  bool get isNormalized;
 }
 
 typedef void RenderObjectVisitor(RenderObject child);
@@ -548,7 +550,7 @@ abstract class RenderObject extends AbstractNode implements HitTestTarget {
       assert(parent == this.parent);
     } else {
       _nodesNeedingLayout.add(this);
-      scheduler.ensureVisualUpdate();
+      Scheduler.instance.ensureVisualUpdate();
     }
   }
 
@@ -657,6 +659,7 @@ abstract class RenderObject extends AbstractNode implements HitTestTarget {
   /// implemented here) to return early if the child does not need to do any
   /// work to update its layout information.
   void layout(Constraints constraints, { bool parentUsesSize: false }) {
+    assert(constraints.isNormalized);
     assert(!_debugDoingThisResize);
     assert(!_debugDoingThisLayout);
     final RenderObject parent = this.parent;
@@ -814,9 +817,6 @@ abstract class RenderObject extends AbstractNode implements HitTestTarget {
 
   static bool _debugDoingPaint = false;
   static bool get debugDoingPaint => _debugDoingPaint;
-  static void set debugDoingPaint(bool value) {
-    _debugDoingPaint = value;
-  }
   bool _debugDoingThisPaint = false;
   bool get debugDoingThisPaint => _debugDoingThisPaint;
   static RenderObject _debugActivePaint = null;
@@ -915,7 +915,7 @@ abstract class RenderObject extends AbstractNode implements HitTestTarget {
       // ourselves without involving any other nodes.
       assert(_layer != null);
       _nodesNeedingPaint.add(this);
-      scheduler.ensureVisualUpdate();
+      Scheduler.instance.ensureVisualUpdate();
     } else if (parent is RenderObject) {
       // We don't have our own layer; one of our ancestors will take
       // care of updating the layer we're in and when they do that
@@ -929,7 +929,7 @@ abstract class RenderObject extends AbstractNode implements HitTestTarget {
       // then we have to paint ourselves, since nobody else can paint
       // us. We don't add ourselves to _nodesNeedingPaint in this
       // case, because the root is always told to paint regardless.
-      scheduler.ensureVisualUpdate();
+      Scheduler.instance.ensureVisualUpdate();
     }
   }
 
@@ -1035,12 +1035,14 @@ abstract class RenderObject extends AbstractNode implements HitTestTarget {
   /// be recorded on separate compositing layers.
   void paint(PaintingContext context, Offset offset) { }
 
-  /// If this render object applies a transform before painting, apply that
-  /// transform to the given matrix
+  /// Applies the transform that would be applied when painting the given child
+  /// to the given matrix.
   ///
-  /// Used by coordinate conversion functions to translate coordiantes local to
+  /// Used by coordinate conversion functions to translate coordinates local to
   /// one render object into coordinates local to another render object.
-  void applyPaintTransform(Matrix4 transform) { }
+  void applyPaintTransform(RenderObject child, Matrix4 transform) {
+    assert(child.parent == this);
+  }
 
 
   // EVENTS

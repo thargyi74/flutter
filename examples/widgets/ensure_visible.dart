@@ -25,13 +25,13 @@ class TappableCard extends StatelessComponent {
   static const TextStyle cardLabelStyle = const TextStyle(
     color: Colors.white,
     fontSize: 18.0,
-    fontWeight: bold
+    fontWeight: FontWeight.bold
   );
 
   static const TextStyle selectedCardLabelStyle = const TextStyle(
     color: Colors.white,
     fontSize: 24.0,
-    fontWeight: bold
+    fontWeight: FontWeight.bold
   );
 
   Widget build(BuildContext context) {
@@ -85,7 +85,7 @@ class EnsureVisibleAppState extends State<EnsureVisibleApp> {
       cardModel: cardModels[index],
       selected: index == selectedCardIndex,
       onTap: (BuildContext context) {
-        ensureWidgetIsVisible(context, duration: const Duration(milliseconds: 200))
+        Scrollable.ensureVisible(context, duration: const Duration(milliseconds: 200))
         .then((_) {
           setState(() { selectedCardIndex = index; });
         });

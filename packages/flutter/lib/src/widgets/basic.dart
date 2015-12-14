@@ -63,12 +63,7 @@ export 'package:flutter/rendering.dart' show
     TextStyle,
     TransferMode,
     ValueChanged,
-    VoidCallback,
-    bold,
-    normal,
-    underline,
-    overline,
-    lineThrough;
+    VoidCallback;
 
 
 // PAINTING NODES
@@ -131,7 +126,9 @@ class ShaderMask extends OneChildRenderObjectWidget {
   }
 }
 
-/// Paints a [BoxDecoration] either before or after its child paints.
+/// Paints a [Decoration] either before or after its child paints.
+///
+/// Commonly used with [BoxDecoration].
 class DecoratedBox extends OneChildRenderObjectWidget {
   DecoratedBox({
     Key key,
@@ -144,6 +141,8 @@ class DecoratedBox extends OneChildRenderObjectWidget {
   }
 
   /// What decoration to paint.
+  ///
+  /// Commonly a [BoxDecoration].
   final Decoration decoration;
 
   /// Where to paint the box decoration.
@@ -546,11 +545,23 @@ class ConstrainedBox extends OneChildRenderObjectWidget {
   }
 }
 
+/// Sizes itself to a fraction of the total available space.
+///
+/// See [RenderFractionallySizedBox] for details.
 class FractionallySizedBox extends OneChildRenderObjectWidget {
   FractionallySizedBox({ Key key, this.width, this.height, Widget child })
     : super(key: key, child: child);
 
+  /// If non-null, the factor of the incoming width to use.
+  ///
+  /// If non-null, the child is given a tight width constraint that is the max
+  /// incoming width constraint multipled by this factor.
   final double width;
+
+  /// If non-null, the factor of the incoming height to use.
+  ///
+  /// If non-null, the child is given a tight height constraint that is the max
+  /// incoming height constraint multipled by this factor.
   final double height;
 
   RenderFractionallySizedBox createRenderObject() => new RenderFractionallySizedBox(
@@ -572,13 +583,28 @@ class FractionallySizedBox extends OneChildRenderObjectWidget {
   }
 }
 
+/// A render object that imposes different constraints on its child than it gets
+/// from its parent, possibly allowing the child to overflow the parent.
+///
+/// See [RenderOverflowBox] for details.
 class OverflowBox extends OneChildRenderObjectWidget {
   OverflowBox({ Key key, this.minWidth, this.maxWidth, this.minHeight, this.maxHeight, Widget child })
     : super(key: key, child: child);
 
+  /// The minimum width constraint to give the child. Set this to null (the
+  /// default) to use the constraint from the parent instead.
   final double minWidth;
+
+  /// The maximum width constraint to give the child. Set this to null (the
+  /// default) to use the constraint from the parent instead.
   final double maxWidth;
+
+  /// The minimum height constraint to give the child. Set this to null (the
+  /// default) to use the constraint from the parent instead.
   final double minHeight;
+
+  /// The maximum height constraint to give the child. Set this to null (the
+  /// default) to use the constraint from the parent instead.
   final double maxHeight;
 
   RenderOverflowBox createRenderObject() => new RenderOverflowBox(
@@ -619,12 +645,19 @@ class OffStage extends OneChildRenderObjectWidget {
   RenderOffStage createRenderObject() => new RenderOffStage();
 }
 
+/// Forces child to layout at a specific aspect ratio.
+///
+/// See [RenderAspectRatio] for details.
 class AspectRatio extends OneChildRenderObjectWidget {
   AspectRatio({ Key key, this.aspectRatio, Widget child })
     : super(key: key, child: child) {
     assert(aspectRatio != null);
   }
 
+  /// The aspect ratio to use when computing the height from the width.
+  ///
+  /// The aspect ratio is expressed as a ratio of width to height. For example,
+  /// a 16:9 width:height aspect ratio would have a value of 16.0/9.0.
   final double aspectRatio;
 
   RenderAspectRatio createRenderObject() => new RenderAspectRatio(aspectRatio: aspectRatio);
@@ -681,6 +714,7 @@ class IntrinsicHeight extends OneChildRenderObjectWidget {
   RenderIntrinsicHeight createRenderObject() => new RenderIntrinsicHeight();
 }
 
+/// Positions its child vertically according to the child's baseline.
 class Baseline extends OneChildRenderObjectWidget {
   Baseline({ Key key, this.baseline, this.baselineType: TextBaseline.alphabetic, Widget child })
     : super(key: key, child: child) {
@@ -688,7 +722,11 @@ class Baseline extends OneChildRenderObjectWidget {
     assert(baselineType != null);
   }
 
-  final double baseline; // in pixels
+  /// The number of logical pixels from the top of this box at which to position
+  /// the child's baseline.
+  final double baseline;
+
+  /// The type of baseline to use for positioning the child.
   final TextBaseline baselineType;
 
   RenderBaseline createRenderObject() => new RenderBaseline(baseline: baseline, baselineType: baselineType);
@@ -765,10 +803,10 @@ class SizeObserver extends OneChildRenderObjectWidget {
 }
 
 
-// CONVENIENCE CLASS TO COMBINE COMMON PAINTING, POSITIONING, AND SIZING NODES
+// CONTAINER
 
+/// A convenience widget that combines common painting, positioning, and sizing widgets.
 class Container extends StatelessComponent {
-
   Container({
     Key key,
     this.child,
@@ -786,14 +824,33 @@ class Container extends StatelessComponent {
     assert(decoration == null || decoration.debugAssertValid());
   }
 
+  /// The child to contain in the container.
+  ///
+  /// If null, the container will expand to fill all available space in its parent.
   final Widget child;
+
+  /// Additional constraints to apply to the child.
   final BoxConstraints constraints;
+
+  /// The decoration to paint behind the child.
   final Decoration decoration;
+
+  /// The decoration to paint in front of the child.
   final Decoration foregroundDecoration;
+
+  /// Empty space to surround the decoration.
   final EdgeDims margin;
+
+  /// Empty space to inscribe inside the decoration.
   final EdgeDims padding;
+
+  /// The transformation matrix to apply before painting the container.
   final Matrix4 transform;
+
+  /// If non-null, requires the decoration to have this width.
   final double width;
+
+  /// If non-null, requires the decoration to have this height.
   final double height;
 
   EdgeDims get _paddingIncludingDecoration {
@@ -865,12 +922,17 @@ class Container extends StatelessComponent {
     if (height != null)
       description.add('height: $height');
   }
-
 }
 
 
 // LAYOUT NODES
 
+/// Uses the block layout algorithm for its children.
+///
+/// This widget is rarely used directly. Instead, consider using [Block], which
+/// combines the block layout algorithm with scrolling behavior.
+///
+/// For details about the block layout algorithm, see [RenderBlockBase].
 class BlockBody extends MultiChildRenderObjectWidget {
   BlockBody(List<Widget> children, {
     Key key,
@@ -879,6 +941,7 @@ class BlockBody extends MultiChildRenderObjectWidget {
     assert(direction != null);
   }
 
+  /// The direction to use as the main axis.
   final BlockDirection direction;
 
   RenderBlock createRenderObject() => new RenderBlock(direction: direction);
@@ -888,12 +951,17 @@ class BlockBody extends MultiChildRenderObjectWidget {
   }
 }
 
+/// Uses the stack layout algorithm for its children.
+///
+/// For details about the stack layout algorithm, see [RenderStack]. To control
+/// the position of child widgets, see the [Positioned] widget.
 class Stack extends MultiChildRenderObjectWidget {
   Stack(List<Widget> children, {
     Key key,
     this.alignment: const FractionalOffset(0.0, 0.0)
   }) : super(key: key, children: children);
 
+  /// How to align the non-positioned children in the stack.
   final FractionalOffset alignment;
 
   RenderStack createRenderObject() => new RenderStack(alignment: alignment);
@@ -903,6 +971,7 @@ class Stack extends MultiChildRenderObjectWidget {
   }
 }
 
+/// A [Stack] that shows a single child at once.
 class IndexedStack extends MultiChildRenderObjectWidget {
   IndexedStack(List<Widget> children, {
     Key key,
@@ -910,7 +979,10 @@ class IndexedStack extends MultiChildRenderObjectWidget {
     this.index: 0
   }) : super(key: key, children: children);
 
+  /// The index of the child to show.
   final int index;
+
+  /// How to align the non-positioned children in the stack.
   final FractionalOffset alignment;
 
   RenderIndexedStack createRenderObject() => new RenderIndexedStack(index: index, alignment: alignment);
@@ -922,6 +994,11 @@ class IndexedStack extends MultiChildRenderObjectWidget {
   }
 }
 
+/// Controls where a child of a [Stack] is positioned.
+///
+/// This widget must be a descendant of a [Stack], and the path from this widget
+/// to its enclosing [Stack] must contain only components (e.g., not other
+/// kinds of widgets, like [RenderObjectWidget]s).
 class Positioned extends ParentDataWidget {
   Positioned({
     Key key,
@@ -949,12 +1026,26 @@ class Positioned extends ParentDataWidget {
        bottom = null,
        super(key: key, child: child);
 
+  /// The offset of the child's top edge from the top of the stack.
   final double top;
+
+  /// The offset of the child's right edge from the right of the stack.
   final double right;
+
+  /// The offset of the child's bottom edge from the bottom of the stack.
   final double bottom;
+
+  /// The offset of the child's left edge from the left of the stack.
   final double left;
 
+  /// The child's width.
+  ///
+  /// Ignored if both left and right are non-null.
   final double width;
+
+  /// The child's height.
+  ///
+  /// Ignored if both top and bottom are non-null.
   final double height;
 
   void debugValidateAncestor(Widget ancestor) {
@@ -1023,6 +1114,9 @@ class Positioned extends ParentDataWidget {
   }
 }
 
+/// Uses the grid layout algorithm for its children.
+///
+/// For details about the grid layout algorithm, see [RenderGrid].
 class Grid extends MultiChildRenderObjectWidget {
   Grid(List<Widget> children, { Key key, this.maxChildExtent })
     : super(key: key, children: children) {
@@ -1038,6 +1132,10 @@ class Grid extends MultiChildRenderObjectWidget {
   }
 }
 
+/// Uses the flex layout algorithm for its children.
+///
+/// For details about the flex layout algorithm, see [RenderFlex]. To control
+/// the flex of child widgets, see the [Flexible] widget.
 class Flex extends MultiChildRenderObjectWidget {
   Flex(List<Widget> children, {
     Key key,
@@ -1066,6 +1164,10 @@ class Flex extends MultiChildRenderObjectWidget {
   }
 }
 
+/// Lays out child elements in a row.
+///
+/// For details about the flex layout algorithm, see [RenderFlex]. To control
+/// the flex of child widgets, see the [Flexible] widget.
 class Row extends Flex {
   Row(List<Widget> children, {
     Key key,
@@ -1075,6 +1177,10 @@ class Row extends Flex {
   }) : super(children, key: key, direction: FlexDirection.horizontal, justifyContent: justifyContent, alignItems: alignItems, textBaseline: textBaseline);
 }
 
+/// Lays out child elements in a column.
+///
+/// For details about the flex layout algorithm, see [RenderFlex]. To control
+/// the flex of child widgets, see the [Flexible] widget.
 class Column extends Flex {
   Column(List<Widget> children, {
     Key key,
@@ -1084,10 +1190,22 @@ class Column extends Flex {
   }) : super(children, key: key, direction: FlexDirection.vertical, justifyContent: justifyContent, alignItems: alignItems, textBaseline: textBaseline);
 }
 
+/// Controls how a child of a [Flex], [Row], or [Column] flexes.
+///
+/// This widget must be a descendant of a [Flex], [Row], or [Column], and the
+/// path from this widget to its enclosing [Flex], [Row], or [Column] must
+/// contain only components (e.g., not other kinds of widgets, like
+/// [RenderObjectWidget]s).
 class Flexible extends ParentDataWidget {
   Flexible({ Key key, this.flex: 1, Widget child })
     : super(key: key, child: child);
 
+  /// The flex factor to use for this child
+  ///
+  /// If null, the child is inflexible and determines its own size. If non-null,
+  /// the child is flexible and its extent in the main axis is determined by
+  /// dividing the free space (after placing the inflexible children)
+  /// according to the flex factors of the flexible children.
   final int flex;
 
   void debugValidateAncestor(Widget ancestor) {
@@ -1114,8 +1232,12 @@ class Flexible extends ParentDataWidget {
   }
 }
 
-class Paragraph extends LeafRenderObjectWidget {
-  Paragraph({ Key key, this.text }) : super(key: key) {
+/// A raw paragraph of text.
+///
+/// This class is rarely used directly. Instead, consider using [Text], which
+/// integrates with [DefaultTextStyle].
+class RawText extends LeafRenderObjectWidget {
+  RawText({ Key key, this.text }) : super(key: key) {
     assert(text != null);
   }
 
@@ -1123,19 +1245,26 @@ class Paragraph extends LeafRenderObjectWidget {
 
   RenderParagraph createRenderObject() => new RenderParagraph(text);
 
-  void updateRenderObject(RenderParagraph renderObject, Paragraph oldWidget) {
+  void updateRenderObject(RenderParagraph renderObject, RawText oldWidget) {
     renderObject.text = text;
   }
 }
 
+/// A convience widget for paragraphs of text with heterogeneous style.
+///
+/// The elements parameter is a recursive list of lists that matches the
+/// following grammar:
+///
+///   `elements ::= "string" | [<text-style> <elements>*]``
+///
+/// Where "string" is text to display and text-style is an instance of
+/// TextStyle. The text-style applies to all of the elements that follow.
 class StyledText extends StatelessComponent {
-  // elements ::= "string" | [<text-style> <elements>*]
-  // Where "string" is text to display and text-style is an instance of
-  // TextStyle. The text-style applies to all of the elements that follow.
   StyledText({ this.elements, Key key }) : super(key: key) {
     assert(_toSpan(elements) != null);
   }
 
+  /// The recursive list of lists that describes the text and style to paint.
   final dynamic elements;
 
   TextSpan _toSpan(dynamic element) {
@@ -1151,10 +1280,11 @@ class StyledText extends StatelessComponent {
   }
 
   Widget build(BuildContext context) {
-    return new Paragraph(text: _toSpan(elements));
+    return new RawText(text: _toSpan(elements));
   }
 }
 
+/// The text style to apply to descendant [Text] widgets without explicit style.
 class DefaultTextStyle extends InheritedWidget {
   DefaultTextStyle({
     Key key,
@@ -1165,8 +1295,10 @@ class DefaultTextStyle extends InheritedWidget {
     assert(child != null);
   }
 
+  /// The text style to apply.
   final TextStyle style;
 
+  /// The style from the closest instance of this class that encloses the given context.
   static TextStyle of(BuildContext context) {
     DefaultTextStyle result = context.inheritFromWidgetOfType(DefaultTextStyle);
     return result?.style;
@@ -1180,12 +1312,23 @@ class DefaultTextStyle extends InheritedWidget {
   }
 }
 
+/// A run of text.
+///
+/// By default, the text will be styled using the closest enclosing
+/// [DefaultTextStyle].
 class Text extends StatelessComponent {
   Text(this.data, { Key key, this.style }) : super(key: key) {
     assert(data != null);
   }
 
+  /// The text to display.
   final String data;
+
+  /// If non-null, the style to use for this text.
+  ///
+  /// If the style's "inherit" property is true, the style will be merged with
+  /// the closest enclosing [DefaultTextStyle]. Otherwise, the style will
+  /// replace the closest enclosing [DefaultTextStyle].
   final TextStyle style;
 
   Widget build(BuildContext context) {
@@ -1198,7 +1341,7 @@ class Text extends StatelessComponent {
     }
     if (combinedStyle != null)
       text = new StyledTextSpan(combinedStyle, <TextSpan>[text]);
-    return new Paragraph(text: text);
+    return new RawText(text: text);
   }
 
   void debugFillDescription(List<String> description) {
@@ -1209,8 +1352,13 @@ class Text extends StatelessComponent {
   }
 }
 
-class Image extends LeafRenderObjectWidget {
-  Image({
+/// Displays a raw image.
+///
+/// This widget is rarely used directly. Instead, consider using [AssetImage] or
+/// [NetworkImage], depending on whather you wish to display an image from the
+/// assert bundle or from the network.
+class RawImage extends LeafRenderObjectWidget {
+  RawImage({
     Key key,
     this.image,
     this.width,
@@ -1222,13 +1370,44 @@ class Image extends LeafRenderObjectWidget {
     this.centerSlice
   }) : super(key: key);
 
+  /// The image to display.
   final ui.Image image;
+
+  /// If non-null, require the image to have this width.
+  ///
+  /// If null, the image will pick a size that best preserves its intrinsic
+  /// aspect ratio.
   final double width;
+
+  /// If non-null, require the image to have this height.
+  ///
+  /// If null, the image will pick a size that best preserves its intrinsic
+  /// aspect ratio.
   final double height;
+
+  /// If non-null, apply this color filter to the image before painint.
   final ColorFilter colorFilter;
+
+  /// How to inscribe the image into the place allocated during layout.
   final ImageFit fit;
+
+  /// How to align the image within its bounds.
+  ///
+  /// An alignment of (0.0, 0.0) aligns the image to the top-left corner of its
+  /// layout bounds.  An alignment of (1.0, 0.5) aligns the image to the middle
+  /// of the right edge of its layout bounds.
   final FractionalOffset alignment;
+
+  /// How to paint any portions of the layout bounds not covered by the image.
   final ImageRepeat repeat;
+
+  /// The center slice for a nine-patch image.
+  ///
+  /// The region of the image inside the center slice will be stretched both
+  /// horizontally and vertically to fit the image into its destination. The
+  /// region of the image above and below the center slice will be stretched
+  /// only horizontally and the region of the image to the left and right of
+  /// the center slice will be stretched only vertically.
   final Rect centerSlice;
 
   RenderImage createRenderObject() => new RenderImage(
@@ -1241,7 +1420,7 @@ class Image extends LeafRenderObjectWidget {
     repeat: repeat,
     centerSlice: centerSlice);
 
-  void updateRenderObject(RenderImage renderObject, Image oldWidget) {
+  void updateRenderObject(RenderImage renderObject, RawImage oldWidget) {
     renderObject.image = image;
     renderObject.width = width;
     renderObject.height = height;
@@ -1253,8 +1432,17 @@ class Image extends LeafRenderObjectWidget {
   }
 }
 
-class ImageListener extends StatefulComponent {
-  ImageListener({
+/// Displays an [ImageResource].
+///
+/// An image resource differs from an image in that it might yet let be loaded
+/// from the underlying storage (e.g., the asset bundle or the network) and it
+/// might change over time (e.g., an animated image).
+///
+/// This widget is rarely used directly. Instead, consider using [AssetImage] or
+/// [NetworkImage], depending on whather you wish to display an image from the
+/// assert bundle or from the network.
+class RawImageResource extends StatefulComponent {
+  RawImageResource({
     Key key,
     this.image,
     this.width,
@@ -1268,19 +1456,50 @@ class ImageListener extends StatefulComponent {
     assert(image != null);
   }
 
+  /// The image to display.
   final ImageResource image;
+
+  /// If non-null, require the image to have this width.
+  ///
+  /// If null, the image will pick a size that best preserves its intrinsic
+  /// aspect ratio.
   final double width;
+
+  /// If non-null, require the image to have this height.
+  ///
+  /// If null, the image will pick a size that best preserves its intrinsic
+  /// aspect ratio.
   final double height;
+
+  /// If non-null, apply this color filter to the image before painint.
   final ColorFilter colorFilter;
+
+  /// How to inscribe the image into the place allocated during layout.
   final ImageFit fit;
+
+  /// How to align the image within its bounds.
+  ///
+  /// An alignment of (0.0, 0.0) aligns the image to the top-left corner of its
+  /// layout bounds.  An alignment of (1.0, 0.5) aligns the image to the middle
+  /// of the right edge of its layout bounds.
   final FractionalOffset alignment;
+
+  /// How to paint any portions of the layout bounds not covered by the image.
   final ImageRepeat repeat;
+
+  /// The center slice for a nine-patch image.
+  ///
+  /// The region of the image inside the center slice will be stretched both
+  /// horizontally and vertically to fit the image into its destination. The
+  /// region of the image above and below the center slice will be stretched
+  /// only horizontally and the region of the image to the left and right of
+  /// the center slice will be stretched only vertically.
   final Rect centerSlice;
 
   _ImageListenerState createState() => new _ImageListenerState();
 }
 
-class _ImageListenerState extends State<ImageListener> {
+class _ImageListenerState extends State<RawImageResource> {
   void initState() {
     super.initState();
     config.image.addListener(_handleImageChanged);
@@ -1299,7 +1518,7 @@ class _ImageListenerState extends State<ImageListener> {
     super.dispose();
   }
 
-  void didUpdateConfig(ImageListener oldConfig) {
+  void didUpdateConfig(RawImageResource oldConfig) {
     if (config.image != oldConfig.image) {
       oldConfig.image.removeListener(_handleImageChanged);
       config.image.addListener(_handleImageChanged);
@@ -1307,7 +1526,7 @@ class _ImageListenerState extends State<ImageListener> {
   }
 
   Widget build(BuildContext context) {
-    return new Image(
+    return new RawImage(
       image: _resolvedImage,
       width: config.width,
       height: config.height,
@@ -1320,6 +1539,7 @@ class _ImageListenerState extends State<ImageListener> {
   }
 }
 
+/// Displays an image loaded from the network.
 class NetworkImage extends StatelessComponent {
   NetworkImage({
     Key key,
@@ -1333,17 +1553,48 @@ class NetworkImage extends StatelessComponent {
     this.centerSlice
   }) : super(key: key);
 
+  /// The URL from which to load the image.
   final String src;
+
+  /// If non-null, require the image to have this width.
+  ///
+  /// If null, the image will pick a size that best preserves its intrinsic
+  /// aspect ratio.
   final double width;
+
+  /// If non-null, require the image to have this height.
+  ///
+  /// If null, the image will pick a size that best preserves its intrinsic
+  /// aspect ratio.
   final double height;
+
+  /// If non-null, apply this color filter to the image before painint.
   final ColorFilter colorFilter;
+
+  /// How to inscribe the image into the place allocated during layout.
   final ImageFit fit;
+
+  /// How to align the image within its bounds.
+  ///
+  /// An alignment of (0.0, 0.0) aligns the image to the top-left corner of its
+  /// layout bounds.  An alignment of (1.0, 0.5) aligns the image to the middle
+  /// of the right edge of its layout bounds.
   final FractionalOffset alignment;
+
+  /// How to paint any portions of the layout bounds not covered by the image.
   final ImageRepeat repeat;
+
+  /// The center slice for a nine-patch image.
+  ///
+  /// The region of the image inside the center slice will be stretched both
+  /// horizontally and vertically to fit the image into its destination. The
+  /// region of the image above and below the center slice will be stretched
+  /// only horizontally and the region of the image to the left and right of
+  /// the center slice will be stretched only vertically.
   final Rect centerSlice;
 
   Widget build(BuildContext context) {
-    return new ImageListener(
+    return new RawImageResource(
       image: imageCache.load(src),
       width: width,
       height: height,
@@ -1356,6 +1607,10 @@ class NetworkImage extends StatelessComponent {
   }
 }
 
+/// Sets a default asset bundle for its descendants.
+///
+/// For example, used by [AssetImage] to determine which bundle to use if no
+/// bundle is specified explicitly.
 class DefaultAssetBundle extends InheritedWidget {
   DefaultAssetBundle({
     Key key,
@@ -1366,8 +1621,10 @@ class DefaultAssetBundle extends InheritedWidget {
     assert(child != null);
   }
 
+  /// The bundle to use as a default.
   final AssetBundle bundle;
 
+  /// The bundle from the closest instance of this class that encloses the given context.
   static AssetBundle of(BuildContext context) {
     DefaultAssetBundle result = context.inheritFromWidgetOfType(DefaultAssetBundle);
     return result?.bundle;
@@ -1376,6 +1633,11 @@ class DefaultAssetBundle extends InheritedWidget {
   bool updateShouldNotify(DefaultAssetBundle old) => bundle != old.bundle;
 }
 
+/// Displays an image provided by an [ImageProvider].
+///
+/// This widget lets you customize how images are loaded by supplying your own
+/// image provider. Internally, [NetworkImage] uses an [ImageProvider] that
+/// loads the image from the network.
 class AsyncImage extends StatelessComponent {
   AsyncImage({
     Key key,
@@ -1389,17 +1651,48 @@ class AsyncImage extends StatelessComponent {
     this.centerSlice
   }) : super(key: key);
 
+  /// The object that will provide the image.
   final ImageProvider provider;
+
+  /// If non-null, require the image to have this width.
+  ///
+  /// If null, the image will pick a size that best preserves its intrinsic
+  /// aspect ratio.
   final double width;
+
+  /// If non-null, require the image to have this height.
+  ///
+  /// If null, the image will pick a size that best preserves its intrinsic
+  /// aspect ratio.
   final double height;
+
+  /// If non-null, apply this color filter to the image before painint.
   final ColorFilter colorFilter;
+
+  /// How to inscribe the image into the place allocated during layout.
   final ImageFit fit;
+
+  /// How to align the image within its bounds.
+  ///
+  /// An alignment of (0.0, 0.0) aligns the image to the top-left corner of its
+  /// layout bounds.  An alignment of (1.0, 0.5) aligns the image to the middle
+  /// of the right edge of its layout bounds.
   final FractionalOffset alignment;
+
+  /// How to paint any portions of the layout bounds not covered by the image.
   final ImageRepeat repeat;
+
+  /// The center slice for a nine-patch image.
+  ///
+  /// The region of the image inside the center slice will be stretched both
+  /// horizontally and vertically to fit the image into its destination. The
+  /// region of the image above and below the center slice will be stretched
+  /// only horizontally and the region of the image to the left and right of
+  /// the center slice will be stretched only vertically.
   final Rect centerSlice;
 
   Widget build(BuildContext context) {
-    return new ImageListener(
+    return new RawImageResource(
       image: imageCache.loadProvider(provider),
       width: width,
       height: height,
@@ -1412,8 +1705,14 @@ class AsyncImage extends StatelessComponent {
   }
 }
 
+/// Displays an image from an [AssetBundle].
+///
+/// By default, asset image will load the image from the cloest enclosing
+/// [DefaultAssetBundle].
 class AssetImage extends StatelessComponent {
-  AssetImage({
+  // Don't add asserts here unless absolutely necessary, since it will
+  // require removing the const constructor, which is an API change.
+  const AssetImage({
     Key key,
     this.name,
     this.bundle,
@@ -1426,18 +1725,54 @@ class AssetImage extends StatelessComponent {
     this.centerSlice
   }) : super(key: key);
 
+  /// The name of the image in the assert bundle.
   final String name;
+
+  /// The bundle from which to load the image.
+  ///
+  /// If null, the image will be loaded from the closest enclosing
+  /// [DefaultAssetBundle].
   final AssetBundle bundle;
+
+  /// If non-null, require the image to have this width.
+  ///
+  /// If null, the image will pick a size that best preserves its intrinsic
+  /// aspect ratio.
   final double width;
+
+  /// If non-null, require the image to have this height.
+  ///
+  /// If null, the image will pick a size that best preserves its intrinsic
+  /// aspect ratio.
   final double height;
+
+  /// If non-null, apply this color filter to the image before painint.
   final ColorFilter colorFilter;
+
+  /// How to inscribe the image into the place allocated during layout.
   final ImageFit fit;
+
+  /// How to align the image within its bounds.
+  ///
+  /// An alignment of (0.0, 0.0) aligns the image to the top-left corner of its
+  /// layout bounds.  An alignment of (1.0, 0.5) aligns the image to the middle
+  /// of the right edge of its layout bounds.
   final FractionalOffset alignment;
+
+  /// How to paint any portions of the layout bounds not covered by the image.
   final ImageRepeat repeat;
+
+  /// The center slice for a nine-patch image.
+  ///
+  /// The region of the image inside the center slice will be stretched both
+  /// horizontally and vertically to fit the image into its destination. The
+  /// region of the image above and below the center slice will be stretched
+  /// only horizontally and the region of the image to the left and right of
+  /// the center slice will be stretched only vertically.
   final Rect centerSlice;
 
   Widget build(BuildContext context) {
-    return new ImageListener(
+    return new RawImageResource(
       image: (bundle ?? DefaultAssetBundle.of(context)).loadImage(name),
       width: width,
       height: height,
@@ -1450,6 +1785,11 @@ class AssetImage extends StatelessComponent {
   }
 }
 
+/// An adapter for placing a specific [RenderBox] in the widget tree.
+///
+/// A given render object can be placed at most once in the widget tree. This
+/// widget enforces that restriction by keying itself using a [GlobalObjectKey]
+/// for the given render object.
 class WidgetToRenderBoxAdapter extends LeafRenderObjectWidget {
   WidgetToRenderBoxAdapter(RenderBox renderBox)
     : renderBox = renderBox,
@@ -1461,6 +1801,7 @@ class WidgetToRenderBoxAdapter extends LeafRenderObjectWidget {
     assert(renderBox != null);
   }
 
+  /// The render box to place in the widget tree.
   final RenderBox renderBox;
 
   RenderBox createRenderObject() => renderBox;

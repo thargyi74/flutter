@@ -4,6 +4,7 @@
 
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'dart:ui' show hashValues;
 
 import 'package:flutter/animation.dart';
 import 'package:flutter/gestures.dart';
@@ -88,6 +89,7 @@ class BoxConstraints extends Constraints {
   /// Returns new box constraints that are smaller by the given edge dimensions
   BoxConstraints deflate(EdgeDims edges) {
     assert(edges != null);
+    assert(isNormalized);
     double horizontal = edges.left + edges.right;
     double vertical = edges.top + edges.bottom;
     double deflatedMinWidth = math.max(0.0, minWidth - horizontal);
@@ -102,6 +104,7 @@ class BoxConstraints extends Constraints {
 
   /// Returns new box constraints that remove the minimum width and height requirements
   BoxConstraints loosen() {
+    assert(isNormalized);
     return new BoxConstraints(
       minWidth: 0.0,
       maxWidth: maxWidth,
@@ -144,19 +147,24 @@ class BoxConstraints extends Constraints {
 
   /// Returns the width that both satisfies the constraints and is as close as possible to the given width
   double constrainWidth([double width = double.INFINITY]) {
+    assert(isNormalized);
     return clamp(min: minWidth, max: maxWidth, value: width);
   }
 
   /// Returns the height that both satisfies the constraints and is as close as possible to the given height
   double constrainHeight([double height = double.INFINITY]) {
+    assert(isNormalized);
     return clamp(min: minHeight, max: maxHeight, value: height);
   }
 
   /// Returns the size that both satisfies the constraints and is as close as possible to the given size
   Size constrain(Size size) {
     Size result = new Size(constrainWidth(size.width), constrainHeight(size.height));
-    if (size is _DebugSize)
-      result = new _DebugSize(result, size._owner, size._canBeUsedByParent);
+    assert(() {
+      if (size is _DebugSize)
+        result = new _DebugSize(result, size._owner, size._canBeUsedByParent);
+      return true;
+    });
     return result;
   }
 
@@ -177,8 +185,9 @@ class BoxConstraints extends Constraints {
 
   /// Whether the given size satisfies the constraints
   bool isSatisfiedBy(Size size) {
-    return (minWidth <= size.width) && (size.width <= math.max(minWidth, maxWidth)) &&
-           (minHeight <= size.height) && (size.height <= math.max(minHeight, maxHeight));
+    assert(isNormalized);
+    return (minWidth <= size.width) && (size.width <= maxWidth) &&
+           (minHeight <= size.height) && (size.height <= maxHeight);
   }
 
   BoxConstraints operator*(double other) {
@@ -227,6 +236,8 @@ class BoxConstraints extends Constraints {
       return b * t;
     if (b == null)
       return a * (1.0 - t);
+    assert(a.isNormalized);
+    assert(b.isNormalized);
     return new BoxConstraints(
       minWidth: ui.lerpDouble(a.minWidth, b.minWidth, t),
       maxWidth: ui.lerpDouble(a.maxWidth, b.maxWidth, t),
@@ -235,12 +246,25 @@ class BoxConstraints extends Constraints {
     );
   }
 
+  bool get isNormalized => minWidth <= maxWidth && minHeight <= maxHeight;
+
+  BoxConstraints normalize() {
+    return new BoxConstraints(
+      minWidth: minWidth,
+      maxWidth: minWidth > maxWidth ? minWidth : maxWidth,
+      minHeight: minHeight,
+      maxHeight: minHeight > maxHeight ? minHeight : maxHeight
+    );
+  }
+
   bool operator ==(dynamic other) {
+    assert(isNormalized);
     if (identical(this, other))
       return true;
     if (other is! BoxConstraints)
       return false;
     final BoxConstraints typedOther = other;
+    assert(typedOther.isNormalized);
     return minWidth == typedOther.minWidth &&
            maxWidth == typedOther.maxWidth &&
            minHeight == typedOther.minHeight &&
@@ -248,20 +272,17 @@ class BoxConstraints extends Constraints {
   }
 
   int get hashCode {
-    int value = 373;
-    value = 37 * value + minWidth.hashCode;
-    value = 37 * value + maxWidth.hashCode;
-    value = 37 * value + minHeight.hashCode;
-    value = 37 * value + maxHeight.hashCode;
-    return value;
+    assert(isNormalized);
+    return hashValues(minWidth, maxWidth, minHeight, maxHeight);
   }
 
   String toString() {
+    String annotation = isNormalized ? '' : '; NOT NORMALIZED';
     if (minWidth == double.INFINITY && minHeight == double.INFINITY)
-      return 'BoxConstraints(biggest)';
+      return 'BoxConstraints(biggest$annotation)';
     if (minWidth == 0 && maxWidth == double.INFINITY &&
         minHeight == 0 && maxHeight == double.INFINITY)
-      return 'BoxConstraints(unconstrained)';
+      return 'BoxConstraints(unconstrained$annotation)';
     String describe(double min, double max, String dim) {
       if (min == max)
         return '$dim=${min.toStringAsFixed(1)}';
@@ -269,7 +290,7 @@ class BoxConstraints extends Constraints {
     }
     final String width = describe(minWidth, maxWidth, 'w');
     final String height = describe(minHeight, maxHeight, 'h');
-    return 'BoxConstraints($width, $height)';
+    return 'BoxConstraints($width, $height$annotation)';
   }
 }
 
@@ -334,6 +355,7 @@ abstract class RenderBox extends RenderObject {
   ///
   /// Override in subclasses that implement [performLayout].
   double getMinIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     return constraints.constrainWidth(0.0);
   }
 
@@ -342,6 +364,7 @@ abstract class RenderBox extends RenderObject {
   ///
   /// Override in subclasses that implement [performLayout].
   double getMaxIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     return constraints.constrainWidth(0.0);
   }
 
@@ -350,6 +373,7 @@ abstract class RenderBox extends RenderObject {
   ///
   /// Override in subclasses that implement [performLayout].
   double getMinIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     return constraints.constrainHeight(0.0);
   }
 
@@ -362,6 +386,7 @@ abstract class RenderBox extends RenderObject {
   ///
   /// Override in subclasses that implement [performLayout].
   double getMaxIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     return constraints.constrainHeight(0.0);
   }
 
@@ -535,10 +560,15 @@ abstract class RenderBox extends RenderObject {
     assert(!size.isInfinite);
   }
   void performLayout() {
-    // descendants have to either override performLayout() to set both
-    // width and height and lay out children, or, set sizedByParent to
-    // true so that performResize()'s logic above does its thing.
-    assert(sizedByParent);
+    assert(() {
+      if (!sizedByParent) {
+        debugPrint('$runtimeType needs to either override performLayout() to\n'
+          'set size and lay out children, or, set sizedByParent to true\n'
+          'so that performResize() sizes the render object.');
+        assert(sizedByParent);
+      }
+      return true;
+    });
   }
 
   /// Determines the set of render objects located at the given position
@@ -552,6 +582,7 @@ abstract class RenderBox extends RenderObject {
   /// whether the given position is within its bounds.
   bool hitTest(HitTestResult result, { Point position }) {
     assert(!needsLayout);
+    assert(_size != null && 'Missing size. Did you set a size during layout?' != null);
     if (position.x >= 0.0 && position.x < _size.width &&
         position.y >= 0.0 && position.y < _size.height) {
       if (hitTestChildren(result, position: position) || hitTestSelf(position)) {
@@ -574,23 +605,26 @@ abstract class RenderBox extends RenderObject {
   /// visually "on top" (i.e., paints later).
   bool hitTestChildren(HitTestResult result, { Point position }) => false;
 
-  /// Multiply the transform from the parent's coordinate system to this box's
-  /// coordinate system into the given transform
-  ///
-  /// This function is used to convert coordinate systems between boxes.
-  /// Subclasses that apply transforms during painting should override this
-  /// function to factor those transforms into the calculation.
-  void applyPaintTransform(Matrix4 transform) {
-    if (parentData is BoxParentData) {
-      Point position = (parentData as BoxParentData).position;
-      transform.translate(position.x, position.y);
-    }
-  }
-
   static Point _transformPoint(Matrix4 transform, Point point) {
     Vector3 position3 = new Vector3(point.x, point.y, 0.0);
     Vector3 transformed3 = transform.transform3(position3);
     return new Point(transformed3.x, transformed3.y);
+  }
+
+  /// Multiply the transform from the parent's coordinate system to this box's
+  /// coordinate system into the given transform.
+  ///
+  /// This function is used to convert coordinate systems between boxes.
+  /// Subclasses that apply transforms during painting should override this
+  /// function to factor those transforms into the calculation.
+  ///
+  /// The RenderBox implementation takes care of adjusting the matrix for the
+  /// position of the given child.
+  void applyPaintTransform(RenderObject child, Matrix4 transform) {
+    assert(child.parent == this);
+    BoxParentData childParentData = child.parentData;
+    Point position = childParentData.position;
+    transform.translate(position.x, position.y);
   }
 
   /// Convert the given point from the global coodinate system to the local
@@ -599,24 +633,25 @@ abstract class RenderBox extends RenderObject {
     assert(attached);
     Matrix4 transform = new Matrix4.identity();
     RenderObject renderer = this;
-    while (renderer != null) {
-      renderer.applyPaintTransform(transform);
-      renderer = renderer.parent;
+    while (renderer.parent is RenderObject) {
+      RenderObject rendererParent = renderer.parent;
+      rendererParent.applyPaintTransform(renderer, transform);
+      renderer = rendererParent;
     }
     /* double det = */ transform.invert();
     // TODO(abarth): Check the determinant for degeneracy.
     return _transformPoint(transform, point);
   }
 
-  /// Convert the given point from the local coordiante system for this box to
-  /// the global coordinate sytem
+  /// Convert the given point from the local coordinate system for this box to
+  /// the global coordinate system.
   Point localToGlobal(Point point) {
     List<RenderObject> renderers = <RenderObject>[];
     for (RenderObject renderer = this; renderer != null; renderer = renderer.parent)
       renderers.add(renderer);
     Matrix4 transform = new Matrix4.identity();
-    for (RenderObject renderer in renderers.reversed)
-      renderer.applyPaintTransform(transform);
+    for (int index = renderers.length - 1; index > 0; index -= 1)
+      renderers[index].applyPaintTransform(renderers[index - 1], transform);
     return _transformPoint(transform, point);
   }
 

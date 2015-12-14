@@ -77,7 +77,7 @@ class StocksAppState extends State<StocksApp> {
     }
   }
 
-  Route _getRoute(NamedRouteSettings settings) {
+  Route _getRoute(RouteSettings settings) {
     List<String> path = settings.name.split('/');
     if (path[0] != '')
       return null;
@@ -94,12 +94,11 @@ class StocksAppState extends State<StocksApp> {
     return null;
   }
 
-  Future<LocaleQueryData> _onLocaleChanged(ui.Locale locale) {
+  Future<LocaleQueryData> _onLocaleChanged(ui.Locale locale) async {
     String localeString = locale.toString();
-    return initializeMessages(localeString).then((_) {
-      Intl.defaultLocale = localeString;
-      return StockStrings.instance;
-    });
+    await initializeMessages(localeString);
+    Intl.defaultLocale = localeString;
+    return StockStrings.instance;
   }
 
   Widget build(BuildContext context) {

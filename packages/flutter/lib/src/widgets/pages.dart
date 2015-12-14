@@ -14,7 +14,7 @@ import 'routes.dart';
 abstract class PageRoute<T> extends ModalRoute<T> {
   PageRoute({
     Completer<T> completer,
-    NamedRouteSettings settings: const NamedRouteSettings()
+    RouteSettings settings: const RouteSettings()
   }) : super(completer: completer, settings: settings);
   bool get opaque => true;
   bool get barrierDismissable => false;
@@ -28,7 +28,7 @@ abstract class PageRoute<T> extends ModalRoute<T> {
     return performance;
   }
 
-  // Subclasses can override this method to customize way heroes are inserted
+  /// Subclasses can override this method to customize how heroes are inserted.
   void insertHeroOverlayEntry(OverlayEntry entry, Object tag, OverlayState overlay) {
     overlay.insert(entry);
   }

@@ -22,9 +22,18 @@ class StockHome extends StatefulComponent {
 class StockHomeState extends State<StockHome> {
 
   final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
-  final TabBarSelection _tabBarSelection = new TabBarSelection();
   bool _isSearching = false;
   String _searchQuery;
+  TabBarSelection _tabBarSelection;
+
+  void initState() {
+    super.initState();
+    _tabBarSelection = PageStorage.of(context)?.readState(context);
+    if (_tabBarSelection == null) {
+      _tabBarSelection = new TabBarSelection();
+      PageStorage.of(context)?.writeState(context, _tabBarSelection);
+    }
+  }
 
   void _handleSearchBegin() {
     ModalRoute.of(context).addLocalHistoryEntry(new LocalHistoryEntry(
@@ -263,36 +272,25 @@ class StockHomeState extends State<StockHome> {
     );
   }
 
-  double _viewWidth = 100.0;
-  void _handleSizeChanged(Size newSize) {
-    setState(() {
-      _viewWidth = newSize.width;
-    });
-  }
-
   Widget build(BuildContext context) {
     return new Scaffold(
       key: _scaffoldKey,
       toolBar: _isSearching ? buildSearchBar() : buildToolBar(),
       floatingActionButton: buildFloatingActionButton(),
       drawer: _buildDrawer(context),
-      body: new SizeObserver(
-        onSizeChanged: _handleSizeChanged,
-        child: new TabBarView<StockHomeTab>(
-          selection: _tabBarSelection,
-          items: <StockHomeTab>[StockHomeTab.market, StockHomeTab.portfolio],
-          itemExtent: _viewWidth,
-          itemBuilder: (BuildContext context, StockHomeTab tab, _) {
-            switch (tab) {
-              case StockHomeTab.market:
-                return _buildStockTab(context, tab, config.symbols);
-              case StockHomeTab.portfolio:
-                return _buildStockTab(context, tab, portfolioSymbols);
-              default:
-                assert(false);
-            }
+      body: new TabBarView<StockHomeTab>(
+        selection: _tabBarSelection,
+        items: <StockHomeTab>[StockHomeTab.market, StockHomeTab.portfolio],
+        itemBuilder: (BuildContext context, StockHomeTab tab, _) {
+          switch (tab) {
+            case StockHomeTab.market:
+              return _buildStockTab(context, tab, config.symbols);
+            case StockHomeTab.portfolio:
+              return _buildStockTab(context, tab, portfolioSymbols);
+            default:
+              assert(false);
           }
-        )
+        }
       )
     );
   }

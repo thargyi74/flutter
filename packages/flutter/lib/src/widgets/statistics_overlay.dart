@@ -36,7 +36,10 @@ enum StatisticsOption {
   visualizeEngineStatistics,
 }
 
+/// Displays performance statistics.
 class StatisticsOverlay extends LeafRenderObjectWidget {
+  // TODO(abarth): We should have a page on the web site with a screenshot and
+  // an explanation of all the various readouts.
 
   /// Create a statistics overlay that only displays specific statistics. The
   /// mask is created by shifting 1 by the index of the specific StatisticOption
@@ -57,7 +60,7 @@ class StatisticsOverlay extends LeafRenderObjectWidget {
 
   /// The rasterizer threshold is an integer specifying the number of frame
   /// intervals that the rasterizer must miss before it decides that the frame
-  /// is suitable for capturing an SkPicture trace from for further analysis.
+  /// is suitable for capturing an SkPicture trace for further analysis.
   ///
   /// For example, if you want a trace of all pictures that could not be
   /// renderered by the rasterizer within the frame boundary (and hence caused

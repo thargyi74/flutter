@@ -17,9 +17,12 @@ import 'pages.dart';
 
 const _kTransparent = const Color(0x00000000);
 
+/// A route that displays widgets in the [Navigator]'s [Overlay].
 abstract class OverlayRoute<T> extends Route<T> {
+  /// Subclasses should override this getter to return the builders for the overlay.
   List<WidgetBuilder> get builders;
 
+  /// The entries this route has placed in the overlay.
   List<OverlayEntry> get overlayEntries => _overlayEntries;
   final List<OverlayEntry> _overlayEntries = <OverlayEntry>[];
 
@@ -30,7 +33,15 @@ abstract class OverlayRoute<T> extends Route<T> {
     navigator.overlay?.insertAll(_overlayEntries, above: insertionPoint);
   }
 
-  // Subclasses shouldn't call this if they want to delay the finished() call.
+  /// A request was made to pop this route. If the route can handle it
+  /// internally (e.g. because it has its own stack of internal state) then
+  /// return false, otherwise return true. Returning false will prevent the
+  /// default behavior of NavigatorState.pop().
+  ///
+  /// If this is called, the Navigator will not call dispose(). It is the
+  /// responsibility of the Route to later call dispose().
+  ///
+  /// Subclasses shouldn't call this if they want to delay the finished() call.
   bool didPop(T result) {
     finished();
     return true;
@@ -366,13 +377,16 @@ class ModalPosition {
 abstract class ModalRoute<T> extends TransitionRoute<T> with LocalHistoryRoute<T> {
   ModalRoute({
     Completer<T> completer,
-    this.settings: const NamedRouteSettings()
+    this.settings: const RouteSettings()
   }) : super.explicit(completer, null);
 
   // The API for general users of this class
 
-  final NamedRouteSettings settings;
+  final RouteSettings settings;
 
+  /// Returns the modal route most closely associated with the given context.
+  ///
+  /// Returns null if the given context is not associated with a modal route.
   static ModalRoute of(BuildContext context) {
     _ModalScopeStatus widget = context.inheritFromWidgetOfType(_ModalScopeStatus);
     return widget?.route;
@@ -425,16 +439,22 @@ abstract class ModalRoute<T> extends TransitionRoute<T> with LocalHistoryRoute<T
   final PageStorageBucket _storageBucket = new PageStorageBucket();
 
   Widget _buildModalBarrier(BuildContext context) {
+    Widget barrier;
     if (barrierColor != null) {
       assert(barrierColor != _kTransparent);
-      return new AnimatedModalBarrier(
+      barrier = new AnimatedModalBarrier(
         color: new AnimatedColorValue(_kTransparent, end: barrierColor, curve: Curves.ease),
         performance: performance,
         dismissable: barrierDismissable
       );
     } else {
-      return new ModalBarrier(dismissable: barrierDismissable);
+      barrier = new ModalBarrier(dismissable: barrierDismissable);
     }
+    assert(performance.status != PerformanceStatus.dismissed);
+    return new IgnorePointer(
+      ignoring: performance.status == PerformanceStatus.reverse,
+      child: barrier
+    );
   }
 
   Widget _buildModalScope(BuildContext context) {

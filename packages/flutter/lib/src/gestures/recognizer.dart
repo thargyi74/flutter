@@ -14,25 +14,33 @@ export 'pointer_router.dart' show PointerRouter;
 
 abstract class GestureRecognizer extends GestureArenaMember {
 
-  /// Call this with the pointerdown event of each pointer that should be
-  /// considered for this gesture. (It's the GestureRecognizer's responsibility
-  /// to then add itself to the global pointer router to receive subsequent
-  /// events for this pointer.)
+  /// Calls this with the pointerdown event of each pointer that should be
+  /// considered for this gesture.
+  ///
+  /// It's the GestureRecognizer's responsibility to then add itself to the
+  /// global pointer router to receive subsequent events for this pointer.
   void addPointer(PointerDownEvent event);
 
-  /// Release any resources used by the object. Called when the object is no
-  /// longer needed (e.g. a gesture recogniser is being unregistered from a
-  /// [GestureDetector]).
+  /// Releases any resources used by the object.
+  ///
+  /// This method is called when the object is no longer needed (e.g. a gesture
+  /// recogniser is being unregistered from a [GestureDetector]).
   void dispose() { }
 
 }
 
 abstract class OneSequenceGestureRecognizer extends GestureRecognizer {
-  OneSequenceGestureRecognizer({ PointerRouter router }) : _router = router {
+  OneSequenceGestureRecognizer({
+    PointerRouter router,
+    GestureArena gestureArena
+  }) : _router = router,
+       _gestureArena = gestureArena {
     assert(_router != null);
+    assert(_gestureArena != null);
   }
 
   PointerRouter _router;
+  GestureArena _gestureArena;
 
   final List<GestureArenaEntry> _entries = <GestureArenaEntry>[];
   final Set<int> _trackedPointers = new Set<int>();
@@ -56,12 +64,13 @@ abstract class OneSequenceGestureRecognizer extends GestureRecognizer {
     _trackedPointers.clear();
     assert(_entries.isEmpty);
     _router = null;
+    _gestureArena = null;
   }
 
   void startTrackingPointer(int pointer) {
     _router.addRoute(pointer, handleEvent);
     _trackedPointers.add(pointer);
-    _entries.add(GestureArena.instance.add(pointer, this));
+    _entries.add(_gestureArena.add(pointer, this));
   }
 
   void stopTrackingPointer(int pointer) {
@@ -85,8 +94,14 @@ enum GestureRecognizerState {
 }
 
 abstract class PrimaryPointerGestureRecognizer extends OneSequenceGestureRecognizer {
-  PrimaryPointerGestureRecognizer({ PointerRouter router, this.deadline })
-    : super(router: router);
+  PrimaryPointerGestureRecognizer({
+    PointerRouter router,
+    GestureArena gestureArena,
+    this.deadline
+  }) : super(
+    router: router,
+    gestureArena: gestureArena
+  );
 
   final Duration deadline;
 
@@ -123,7 +138,7 @@ abstract class PrimaryPointerGestureRecognizer extends OneSequenceGestureRecogni
   /// Override to provide behavior for the primary pointer when the gesture is still possible.
   void handlePrimaryPointer(PointerEvent event);
 
-  /// Override to be notified with [deadline] is exceeded.
+  /// Override to be notified when [deadline] is exceeded.
   ///
   /// You must override this function if you supply a [deadline].
   void didExceedDeadline() {

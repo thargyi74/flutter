@@ -4,11 +4,11 @@
 
 import 'dart:async';
 
-import 'scheduler.dart';
+import 'package:flutter/scheduler.dart';
 
 typedef TickerCallback(Duration elapsed);
 
-/// Calls its callback once per animation frame
+/// Calls its callback once per animation frame.
 class Ticker {
   /// Constructs a ticker that will call onTick once per frame while running
   Ticker(TickerCallback onTick) : _onTick = onTick;
@@ -19,7 +19,7 @@ class Ticker {
   int _animationId;
   Duration _startTime;
 
-  /// Start calling onTick once per animation frame
+  /// Starts calling onTick once per animation frame.
   ///
   /// The returned future resolves once the ticker stops ticking.
   Future start() {
@@ -30,7 +30,7 @@ class Ticker {
     return _completer.future;
   }
 
-  /// Stop calling onTick
+  /// Stops calling onTick.
   ///
   /// Causes the future returned by [start] to resolve.
   void stop() {
@@ -40,7 +40,7 @@ class Ticker {
     _startTime = null;
 
     if (_animationId != null) {
-      scheduler.cancelFrameCallbackWithId(_animationId);
+      Scheduler.instance.cancelFrameCallbackWithId(_animationId);
       _animationId = null;
     }
 
@@ -74,6 +74,6 @@ class Ticker {
   void _scheduleTick() {
     assert(isTicking);
     assert(_animationId == null);
-    _animationId = scheduler.scheduleFrameCallback(_tick);
+    _animationId = Scheduler.instance.scheduleFrameCallback(_tick);
   }
 }

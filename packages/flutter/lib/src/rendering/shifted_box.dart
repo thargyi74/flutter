@@ -7,33 +7,36 @@ import 'package:flutter/painting.dart';
 import 'box.dart';
 import 'object.dart';
 
+/// Abstract class for one-child-layout render boxes that provide control over
+/// the child's position.
 abstract class RenderShiftedBox extends RenderBox with RenderObjectWithChildMixin<RenderBox> {
-
-  // Abstract class for one-child-layout render boxes
-
   RenderShiftedBox(RenderBox child) {
     this.child = child;
   }
 
   double getMinIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMinIntrinsicWidth(constraints);
     return super.getMinIntrinsicWidth(constraints);
   }
 
   double getMaxIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMaxIntrinsicWidth(constraints);
     return super.getMaxIntrinsicWidth(constraints);
   }
 
   double getMinIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMinIntrinsicHeight(constraints);
     return super.getMinIntrinsicHeight(constraints);
   }
 
   double getMaxIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMaxIntrinsicHeight(constraints);
     return super.getMaxIntrinsicHeight(constraints);
@@ -100,6 +103,7 @@ class RenderPadding extends RenderShiftedBox {
   }
 
   double getMinIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     double totalPadding = padding.left + padding.right;
     if (child != null)
       return child.getMinIntrinsicWidth(constraints.deflate(padding)) + totalPadding;
@@ -107,6 +111,7 @@ class RenderPadding extends RenderShiftedBox {
   }
 
   double getMaxIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     double totalPadding = padding.left + padding.right;
     if (child != null)
       return child.getMaxIntrinsicWidth(constraints.deflate(padding)) + totalPadding;
@@ -114,6 +119,7 @@ class RenderPadding extends RenderShiftedBox {
   }
 
   double getMinIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     double totalPadding = padding.top + padding.bottom;
     if (child != null)
       return child.getMinIntrinsicHeight(constraints.deflate(padding)) + totalPadding;
@@ -121,6 +127,7 @@ class RenderPadding extends RenderShiftedBox {
   }
 
   double getMaxIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     double totalPadding = padding.top + padding.bottom;
     if (child != null)
       return child.getMaxIntrinsicHeight(constraints.deflate(padding)) + totalPadding;
@@ -242,10 +249,10 @@ class RenderPositionedBox extends RenderShiftedBox {
 
 /// A delegate for computing the layout of a render object with a single child.
 class OneChildLayoutDelegate {
-  /// Returns the size of this object given the incomming constraints.
+  /// Returns the size of this object given the incoming constraints.
   Size getSize(BoxConstraints constraints) => constraints.biggest;
 
-  /// Returns the box constraints for the child given the incomming constraints.
+  /// Returns the box constraints for the child given the incoming constraints.
   BoxConstraints getConstraintsForChild(BoxConstraints constraints) => constraints;
 
   /// Returns the position where the child should be placed given the size of this object and the size of the child.
@@ -282,18 +289,22 @@ class RenderCustomOneChildLayoutBox extends RenderShiftedBox {
   }
 
   double getMinIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     return _getSize(constraints).width;
   }
 
   double getMaxIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     return _getSize(constraints).width;
   }
 
   double getMinIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     return _getSize(constraints).height;
   }
 
   double getMaxIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     return _getSize(constraints).height;
   }
 
@@ -305,13 +316,16 @@ class RenderCustomOneChildLayoutBox extends RenderShiftedBox {
 
   void performLayout() {
     if (child != null) {
-      child.layout(delegate.getConstraintsForChild(constraints), parentUsesSize: true);
+      BoxConstraints childConstraints = delegate.getConstraintsForChild(constraints);
+      assert(childConstraints.isNormalized);
+      child.layout(childConstraints, parentUsesSize: !childConstraints.isTight);
       final BoxParentData childParentData = child.parentData;
-      childParentData.position = delegate.getPositionForChild(size, child.size);
+      childParentData.position = delegate.getPositionForChild(size, childConstraints.isTight ? childConstraints.smallest : child.size);
     }
   }
 }
 
+/// Positions its child vertically according to the child's baseline.
 class RenderBaseline extends RenderShiftedBox {
 
   RenderBaseline({
@@ -325,8 +339,10 @@ class RenderBaseline extends RenderShiftedBox {
     assert(baselineType != null);
   }
 
-  double _baseline;
+  /// The number of logical pixels from the top of this box at which to position
+  /// the child's baseline.
   double get baseline => _baseline;
+  double _baseline;
   void set baseline (double value) {
     assert(value != null);
     if (_baseline == value)
@@ -335,8 +351,9 @@ class RenderBaseline extends RenderShiftedBox {
     markNeedsLayout();
   }
 
-  TextBaseline _baselineType;
+  /// The type of baseline to use for positioning the child.
   TextBaseline get baselineType => _baselineType;
+  TextBaseline _baselineType;
   void set baselineType (TextBaseline value) {
     assert(value != null);
     if (_baselineType == value)

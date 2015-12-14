@@ -2,27 +2,82 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:ui' as ui;
 import 'dart:developer';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 
 import 'framework.dart';
 
-class WidgetFlutterBinding extends FlutterBinding {
+class BindingObserver {
+  bool didPopRoute() => false;
+  void didChangeSize(Size size) { }
+  void didChangeLocale(ui.Locale locale) { }
+}
 
-  WidgetFlutterBinding() {
+/// A concrete binding for applications based on the Widgets framework.
+/// This is the glue that binds the framework to the Flutter engine.
+class WidgetFlutterBinding extends BindingBase with Scheduler, Gesturer, Renderer {
+
+  WidgetFlutterBinding._();
+
+  /// Creates and initializes the WidgetFlutterBinding. This constructor is
+  /// idempotent; calling it a second time will just return the
+  /// previously-created instance.
+  static WidgetFlutterBinding ensureInitialized() {
+    if (_instance == null)
+      new WidgetFlutterBinding._();
+    return _instance;
+  }
+
+  initInstances() {
+    super.initInstances();
+    _instance = this;
     BuildableElement.scheduleBuildFor = scheduleBuildFor;
+    ui.window.onLocaleChanged = handleLocaleChanged;
+    ui.window.onPopRoute = handlePopRoute;
   }
 
-  /// Ensures that there is a FlutterBinding object instantiated.
-  static void ensureInitialized() {
-    if (FlutterBinding.instance == null)
-      new WidgetFlutterBinding();
-    assert(FlutterBinding.instance is WidgetFlutterBinding);
+  /// The one static instance of this class.
+  ///
+  /// Only valid after the WidgetFlutterBinding constructor) has been called.
+  /// Only one binding class can be instantiated per process. If another
+  /// BindingBase implementation has been instantiated before this one (e.g.
+  /// bindings from other frameworks based on the Flutter "rendering" library),
+  /// then WidgetFlutterBinding.instance will not be valid (and will throw in
+  /// checked mode).
+  static WidgetFlutterBinding _instance;
+  static WidgetFlutterBinding get instance => _instance;
+
+  final List<BindingObserver> _observers = new List<BindingObserver>();
+
+  void addObserver(BindingObserver observer) => _observers.add(observer);
+  bool removeObserver(BindingObserver observer) => _observers.remove(observer);
+
+  void handleMetricsChanged() {
+    super.handleMetricsChanged();
+    for (BindingObserver observer in _observers)
+      observer.didChangeSize(ui.window.size);
   }
 
-  static WidgetFlutterBinding get instance => FlutterBinding.instance;
+  void handleLocaleChanged() {
+    dispatchLocaleChanged(ui.window.locale);
+  }
+
+  void dispatchLocaleChanged(ui.Locale locale) {
+    for (BindingObserver observer in _observers)
+      observer.didChangeLocale(locale);
+  }
+
+  void handlePopRoute() {
+    for (BindingObserver observer in _observers) {
+      if (observer.didPopRoute())
+        break;
+    }
+  }
 
   void beginFrame() {
     buildDirtyElements();
@@ -38,7 +93,7 @@ class WidgetFlutterBinding extends FlutterBinding {
     assert(!_dirtyElements.contains(element));
     assert(element.dirty);
     if (_dirtyElements.isEmpty)
-      scheduler.ensureVisualUpdate();
+      ensureVisualUpdate();
     _dirtyElements.add(element);
   }
 
@@ -76,17 +131,19 @@ class WidgetFlutterBinding extends FlutterBinding {
   void _runApp(Widget app) {
     _renderViewElement = new RenderObjectToWidgetAdapter<RenderBox>(
       container: renderView,
+      debugShortDescription: '[root]',
       child: app
     ).attachToRenderTree(_renderViewElement);
     beginFrame();
   }
 }
 
+/// Inflate the given widget and attach it to the screen.
 void runApp(Widget app) {
-  WidgetFlutterBinding.ensureInitialized();
-  WidgetFlutterBinding.instance._runApp(app);
+  WidgetFlutterBinding.ensureInitialized()._runApp(app);
 }
 
+/// Print a string representation of the currently running app.
 void debugDumpApp() {
   assert(WidgetFlutterBinding.instance != null);
   assert(WidgetFlutterBinding.instance.renderViewElement != null);
@@ -102,11 +159,15 @@ void debugDumpApp() {
 /// RenderObjectWithChildMixin protocol. The type argument T is the kind of
 /// RenderObject that the container expects as its child.
 class RenderObjectToWidgetAdapter<T extends RenderObject> extends RenderObjectWidget {
-  RenderObjectToWidgetAdapter({ this.child, RenderObjectWithChildMixin<T> container })
-    : container = container, super(key: new GlobalObjectKey(container));
+  RenderObjectToWidgetAdapter({
+    this.child,
+    RenderObjectWithChildMixin<T> container,
+    this.debugShortDescription
+  }) : container = container, super(key: new GlobalObjectKey(container));
 
   final Widget child;
   final RenderObjectWithChildMixin<T> container;
+  final String debugShortDescription;
 
   RenderObjectToWidgetElement<T> createElement() => new RenderObjectToWidgetElement<T>(this);
 
@@ -125,6 +186,8 @@ class RenderObjectToWidgetAdapter<T extends RenderObject> extends RenderObjectWi
     }, building: true);
     return element;
   }
+
+  String toStringShort() => debugShortDescription ?? super.toStringShort();
 }
 
 /// This element class is the instantiation of a [RenderObjectToWidgetAdapter].
@@ -140,7 +203,7 @@ class RenderObjectToWidgetElement<T extends RenderObject> extends RenderObjectEl
 
   Element _child;
 
-  static const _rootChild = const Object();
+  static const _rootChildSlot = const Object();
 
   void visitChildren(ElementVisitor visitor) {
     if (_child != null)
@@ -150,19 +213,19 @@ class RenderObjectToWidgetElement<T extends RenderObject> extends RenderObjectEl
   void mount(Element parent, dynamic newSlot) {
     assert(parent == null);
     super.mount(parent, newSlot);
-    _child = updateChild(_child, widget.child, _rootChild);
+    _child = updateChild(_child, widget.child, _rootChildSlot);
   }
 
   void update(RenderObjectToWidgetAdapter<T> newWidget) {
     super.update(newWidget);
     assert(widget == newWidget);
-    _child = updateChild(_child, widget.child, _rootChild);
+    _child = updateChild(_child, widget.child, _rootChildSlot);
   }
 
   RenderObjectWithChildMixin<T> get renderObject => super.renderObject;
 
   void insertChildRenderObject(RenderObject child, dynamic slot) {
-    assert(slot == _rootChild);
+    assert(slot == _rootChildSlot);
     renderObject.child = child;
   }
 

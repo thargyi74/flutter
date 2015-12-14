@@ -98,24 +98,28 @@ class RenderViewport extends RenderBox with RenderObjectWithChildMixin<RenderBox
   }
 
   double getMinIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMinIntrinsicWidth(_getInnerConstraints(constraints));
     return super.getMinIntrinsicWidth(constraints);
   }
 
   double getMaxIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMaxIntrinsicWidth(_getInnerConstraints(constraints));
     return super.getMaxIntrinsicWidth(constraints);
   }
 
   double getMinIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMinIntrinsicHeight(_getInnerConstraints(constraints));
     return super.getMinIntrinsicHeight(constraints);
   }
 
   double getMaxIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMaxIntrinsicHeight(_getInnerConstraints(constraints));
     return super.getMaxIntrinsicHeight(constraints);
@@ -160,9 +164,9 @@ class RenderViewport extends RenderBox with RenderObjectWithChildMixin<RenderBox
     }
   }
 
-  void applyPaintTransform(Matrix4 transform) {
-    super.applyPaintTransform(transform);
+  void applyPaintTransform(RenderBox child, Matrix4 transform) {
     transform.translate(-scrollOffset.dx, -scrollOffset.dy);
+    super.applyPaintTransform(child, transform);
   }
 
   bool hitTestChildren(HitTestResult result, { Point position }) {

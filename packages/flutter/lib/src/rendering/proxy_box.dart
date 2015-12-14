@@ -38,24 +38,28 @@ class RenderProxyBox extends RenderBox with RenderObjectWithChildMixin<RenderBox
   }
 
   double getMinIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMinIntrinsicWidth(constraints);
     return super.getMinIntrinsicWidth(constraints);
   }
 
   double getMaxIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMaxIntrinsicWidth(constraints);
     return super.getMaxIntrinsicWidth(constraints);
   }
 
   double getMinIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMinIntrinsicHeight(constraints);
     return super.getMinIntrinsicHeight(constraints);
   }
 
   double getMaxIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMaxIntrinsicHeight(constraints);
     return super.getMaxIntrinsicHeight(constraints);
@@ -102,6 +106,7 @@ class RenderConstrainedBox extends RenderProxyBox {
     BoxConstraints additionalConstraints
   }) : _additionalConstraints = additionalConstraints, super(child) {
     assert(additionalConstraints != null);
+    assert(additionalConstraints.isNormalized);
   }
 
   /// Additional constraints to apply to [child] during layout
@@ -109,6 +114,7 @@ class RenderConstrainedBox extends RenderProxyBox {
   BoxConstraints _additionalConstraints;
   void set additionalConstraints (BoxConstraints newConstraints) {
     assert(newConstraints != null);
+    assert(newConstraints.isNormalized);
     if (_additionalConstraints == newConstraints)
       return;
     _additionalConstraints = newConstraints;
@@ -116,24 +122,28 @@ class RenderConstrainedBox extends RenderProxyBox {
   }
 
   double getMinIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMinIntrinsicWidth(_additionalConstraints.enforce(constraints));
     return _additionalConstraints.enforce(constraints).constrainWidth(0.0);
   }
 
   double getMaxIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMaxIntrinsicWidth(_additionalConstraints.enforce(constraints));
     return _additionalConstraints.enforce(constraints).constrainWidth(0.0);
   }
 
   double getMinIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMinIntrinsicHeight(_additionalConstraints.enforce(constraints));
     return _additionalConstraints.enforce(constraints).constrainHeight(0.0);
   }
 
   double getMaxIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMaxIntrinsicHeight(_additionalConstraints.enforce(constraints));
     return _additionalConstraints.enforce(constraints).constrainHeight(0.0);
@@ -154,13 +164,15 @@ class RenderConstrainedBox extends RenderProxyBox {
   }
 }
 
-/// A render object that, for both width and height, imposes a tight constraint
-/// on its child that is a multiple (typically less than 1.0) of the maximum
-/// constraint it received from its parent on that axis. If the factor for a
-/// given axis is null, then the constraints from the parent are just passed
-/// through instead.
+/// Sizes itself to a fraction of the total available space.
 ///
-/// It then tries to size itself the size of its child.
+/// For both its width and width height, this render object imposes a tight
+/// constraint on its child that is a multiple (typically less than 1.0) of the
+/// maximum constraint it received from its parent on that axis. If the factor
+/// for a given axis is null, then the constraints from the parent are just
+/// passed through instead.
+///
+/// It then tries to size itself t the size of its child.
 class RenderFractionallySizedBox extends RenderProxyBox {
   RenderFractionallySizedBox({
     RenderBox child,
@@ -171,9 +183,11 @@ class RenderFractionallySizedBox extends RenderProxyBox {
     assert(_heightFactor == null || _heightFactor >= 0.0);
   }
 
-  /// The multiple to apply to the incoming maximum width constraint to use as
-  /// the tight width constraint for the child, or null to pass through the
-  /// constraints given by the parent.
+  /// If non-null, the factor of the incoming width to use.
+  ///
+  /// If non-null, the child is given a tight width constraint that is the max
+  /// incoming width constraint multipled by this factor.  If null, the child is
+  /// given the incoming width constraings.
   double get widthFactor => _widthFactor;
   double _widthFactor;
   void set widthFactor (double value) {
@@ -184,9 +198,11 @@ class RenderFractionallySizedBox extends RenderProxyBox {
     markNeedsLayout();
   }
 
-  /// The multiple to apply to the incoming maximum height constraint to use as
-  /// the tight height constraint for the child, or null to pass through the
-  /// constraints given by the parent.
+  /// If non-null, the factor of the incoming height to use.
+  ///
+  /// If non-null, the child is given a tight height constraint that is the max
+  /// incoming width constraint multipled by this factor.  If null, the child is
+  /// given the incoming width constraings.
   double get heightFactor => _heightFactor;
   double _heightFactor;
   void set heightFactor (double value) {
@@ -221,24 +237,28 @@ class RenderFractionallySizedBox extends RenderProxyBox {
   }
 
   double getMinIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMinIntrinsicWidth(_getInnerConstraints(constraints));
     return _getInnerConstraints(constraints).constrainWidth(0.0);
   }
 
   double getMaxIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMaxIntrinsicWidth(_getInnerConstraints(constraints));
     return _getInnerConstraints(constraints).constrainWidth(0.0);
   }
 
   double getMinIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMinIntrinsicHeight(_getInnerConstraints(constraints));
     return _getInnerConstraints(constraints).constrainHeight(0.0);
   }
 
   double getMaxIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child != null)
       return child.getMaxIntrinsicHeight(_getInnerConstraints(constraints));
     return _getInnerConstraints(constraints).constrainHeight(0.0);
@@ -307,6 +327,7 @@ class RenderAspectRatio extends RenderProxyBox {
   }
 
   Size _applyAspectRatio(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     double width = constraints.constrainWidth();
     double height = constraints.constrainHeight(width / _aspectRatio);
     return new Size(width, height);
@@ -385,10 +406,12 @@ class RenderIntrinsicWidth extends RenderProxyBox {
   }
 
   double getMinIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     return getMaxIntrinsicWidth(constraints);
   }
 
   double getMaxIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child == null)
       return constraints.constrainWidth(0.0);
     double childResult = child.getMaxIntrinsicWidth(constraints);
@@ -396,6 +419,7 @@ class RenderIntrinsicWidth extends RenderProxyBox {
   }
 
   double getMinIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child == null)
       return constraints.constrainHeight(0.0);
     double childResult = child.getMinIntrinsicHeight(_getInnerConstraints(constraints));
@@ -403,6 +427,7 @@ class RenderIntrinsicWidth extends RenderProxyBox {
   }
 
   double getMaxIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child == null)
       return constraints.constrainHeight(0.0);
     double childResult = child.getMaxIntrinsicHeight(_getInnerConstraints(constraints));
@@ -451,22 +476,26 @@ class RenderIntrinsicHeight extends RenderProxyBox {
   }
 
   double getMinIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child == null)
       return constraints.constrainWidth(0.0);
     return child.getMinIntrinsicWidth(_getInnerConstraints(constraints));
   }
 
   double getMaxIntrinsicWidth(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child == null)
       return constraints.constrainWidth(0.0);
     return child.getMaxIntrinsicWidth(_getInnerConstraints(constraints));
   }
 
   double getMinIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     return getMaxIntrinsicHeight(constraints);
   }
 
   double getMaxIntrinsicHeight(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     if (child == null)
       return constraints.constrainHeight(0.0);
     return child.getMaxIntrinsicHeight(constraints);
@@ -945,9 +974,9 @@ class RenderTransform extends RenderProxyBox {
     }
   }
 
-  void applyPaintTransform(Matrix4 transform) {
-    super.applyPaintTransform(transform);
+  void applyPaintTransform(RenderBox child, Matrix4 transform) {
     transform.multiply(_effectiveTransform);
+    super.applyPaintTransform(child, transform);
   }
 
   void debugDescribeSettings(List<String> settings) {
@@ -1078,9 +1107,19 @@ typedef void PointerMoveEventListener(PointerMoveEvent event);
 typedef void PointerUpEventListener(PointerUpEvent event);
 typedef void PointerCancelEventListener(PointerCancelEvent event);
 
+/// How to behave during hit tests.
 enum HitTestBehavior {
+  /// Targets that defer to their children receive events within their bounds
+  /// only if one of their children is hit by the hit test.
   deferToChild,
+
+  /// Opaque targets can be hit by hit tests, causing them to both receive
+  /// events within their bounds and prevent targets visually behind them from
+  /// also receiving events.
   opaque,
+
+  /// Translucent targets both receive events within their bounds and permit
+  /// targets visually behind them to also receive events.
   translucent,
 }
 

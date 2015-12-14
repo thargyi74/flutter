@@ -34,18 +34,12 @@ class PageableListAppState extends State<PageableListApp> {
   }
 
   static const TextStyle cardLabelStyle =
-    const TextStyle(color: Colors.white, fontSize: 18.0, fontWeight: bold);
+    const TextStyle(color: Colors.white, fontSize: 18.0, fontWeight: FontWeight.bold);
 
   List<CardModel> cardModels;
   Size pageSize = new Size(200.0, 200.0);
   ScrollDirection scrollDirection = ScrollDirection.horizontal;
   bool itemsWrap = false;
-
-  void updatePageSize(Size newSize) {
-    setState(() {
-      pageSize = newSize;
-    });
-  }
 
   Widget buildCard(BuildContext context, CardModel cardModel, int index) {
     Widget card = new Card(
@@ -120,18 +114,11 @@ class PageableListAppState extends State<PageableListApp> {
   }
 
   Widget _buildBody(BuildContext context) {
-    Widget list = new PageableList<CardModel>(
+    return new PageableList<CardModel>(
       items: cardModels,
       itemsWrap: itemsWrap,
       itemBuilder: buildCard,
-      scrollDirection: scrollDirection,
-      itemExtent: (scrollDirection == ScrollDirection.vertical)
-          ? pageSize.height
-          : pageSize.width
-    );
-    return new SizeObserver(
-      onSizeChanged: updatePageSize,
-      child: list
+      scrollDirection: scrollDirection
     );
   }
 

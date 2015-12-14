@@ -23,7 +23,7 @@ abstract class MultiChildLayoutDelegate {
   Map<Object, RenderBox> _idToChild;
   Set<RenderBox> _debugChildrenNeedingLayout;
 
-  /// Returns the size of this object given the incomming constraints.
+  /// Returns the size of this object given the incoming constraints.
   /// The size cannot reflect the instrinsic sizes of the children.
   /// If this layout has a fixed width or height the returned size
   /// can reflect that.
@@ -41,6 +41,7 @@ abstract class MultiChildLayoutDelegate {
       'A MultiChildLayoutDelegate cannot layout the same child more than once.';
       return _debugChildrenNeedingLayout.remove(child);
     });
+    assert(constraints.isNormalized);
     child.layout(constraints, parentUsesSize: true);
     return child.size;
   }
@@ -130,6 +131,7 @@ class RenderCustomMultiChildLayoutBox extends RenderBox
   }
 
   Size _getSize(BoxConstraints constraints) {
+    assert(constraints.isNormalized);
     return constraints.constrain(_delegate.getSize(constraints));
   }
 

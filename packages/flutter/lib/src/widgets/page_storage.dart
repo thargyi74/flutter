@@ -30,16 +30,7 @@ class _StorageEntryIdentifier {
     }
     return true;
   }
-  int get hashCode {
-    int value = 373;
-    value = 37 * value + clientType.hashCode;
-    value = 37 * value + scopeKey.hashCode;
-    if (keys != null) {
-      for (Key key in keys)
-        value = 37 * value + key.hashCode;
-    }
-    return value;
-  }
+  int get hashCode => hashValues(clientType, scopeKey, hashList(keys));
 }
 
 class PageStorageBucket {
@@ -84,7 +75,9 @@ class PageStorage extends StatelessComponent {
   final Widget child;
   final PageStorageBucket bucket;
 
-  /// Might return null if there is no PageStorage in this context.
+  /// The bucket from the closest instance of this class that encloses the given context.
+  ///
+  /// Returns null if none exists.
   static PageStorageBucket of(BuildContext context) {
     PageStorage widget = context.ancestorWidgetOfType(PageStorage);
     return widget?.bucket;

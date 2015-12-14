@@ -11,22 +11,25 @@ import 'package:flutter/widgets.dart';
 
 import 'colors.dart';
 import 'constants.dart';
+import 'debug.dart';
 import 'shadows.dart';
 import 'theme.dart';
 import 'toggleable.dart';
 
 class Switch extends StatelessComponent {
-  Switch({ Key key, this.value, this.onChanged })
+  Switch({ Key key, this.value, this.activeColor, this.onChanged })
       : super(key: key);
 
   final bool value;
+  final Color activeColor;
   final ValueChanged<bool> onChanged;
 
   Widget build(BuildContext context) {
+    assert(debugCheckHasMaterial(context));
     ThemeData themeData = Theme.of(context);
     final isDark = themeData.brightness == ThemeBrightness.dark;
 
-    Color activeThumbColor = themeData.accentColor;
+    Color activeThumbColor = activeColor ?? themeData.accentColor;
     Color activeTrackColor = activeThumbColor.withAlpha(0x80);
 
     Color inactiveThumbColor;
@@ -112,7 +115,7 @@ class _RenderSwitch extends RenderToggleable {
    ) {
     _activeTrackColor = activeTrackColor;
     _inactiveTrackColor = inactiveTrackColor;
-    _drag = new HorizontalDragGestureRecognizer(router: FlutterBinding.instance.pointerRouter)
+    _drag = new HorizontalDragGestureRecognizer(router: Gesturer.instance.pointerRouter, gestureArena: Gesturer.instance.gestureArena)
       ..onStart = _handleDragStart
       ..onUpdate = _handleDragUpdate
       ..onEnd = _handleDragEnd;

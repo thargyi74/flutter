@@ -7,6 +7,7 @@ import 'dart:collection';
 
 import 'package:flutter/rendering.dart';
 
+export 'dart:ui' show hashValues, hashList;
 export 'package:flutter/rendering.dart' show debugPrint;
 
 // KEYS
@@ -335,7 +336,7 @@ enum _StateLifecycle {
 /// The signature of setState() methods.
 typedef void StateSetter(VoidCallback fn);
 
-/// The logic and internal state for a StatefulComponent.
+/// The logic and internal state for a [StatefulComponent].
 abstract class State<T extends StatefulComponent> {
   /// The current configuration (an instance of the corresponding
   /// StatefulComponent class).
@@ -439,13 +440,13 @@ abstract class State<T extends StatefulComponent> {
   }
 }
 
-abstract class ProxyComponent extends Widget {
-  const ProxyComponent({ Key key, this.child }) : super(key: key);
+abstract class _ProxyComponent extends Widget {
+  const _ProxyComponent({ Key key, this.child }) : super(key: key);
 
   final Widget child;
 }
 
-abstract class ParentDataWidget extends ProxyComponent {
+abstract class ParentDataWidget extends _ProxyComponent {
   const ParentDataWidget({ Key key, Widget child })
     : super(key: key, child: child);
 
@@ -460,7 +461,7 @@ abstract class ParentDataWidget extends ProxyComponent {
   void applyParentData(RenderObject renderObject);
 }
 
-abstract class InheritedWidget extends ProxyComponent {
+abstract class InheritedWidget extends _ProxyComponent {
   const InheritedWidget({ Key key, Widget child })
     : super(key: key, child: child);
 
@@ -773,6 +774,7 @@ abstract class Element<T extends Widget> implements BuildContext {
       Element newChild = _findAndActivateElement(key, newWidget);
       if (newChild != null) {
         assert(newChild._parent == null);
+        assert(() { _debugCheckForCycles(newChild); return true; });
         newChild._parent = this;
         newChild._updateDepth();
         newChild.attachRenderObject(newSlot);
@@ -782,9 +784,21 @@ abstract class Element<T extends Widget> implements BuildContext {
       }
     }
     Element newChild = newWidget.createElement();
+    assert(() { _debugCheckForCycles(newChild); return true; });
     newChild.mount(this, newSlot);
     assert(newChild._debugLifecycleState == _ElementLifecycle.active);
     return newChild;
+  }
+
+  void _debugCheckForCycles(Element newChild) {
+    assert(newChild._parent == null);
+    assert(() {
+      Element node = this;
+      while (node._parent != null)
+        node = node._parent;
+      assert(node != newChild); // indicates we are about to create a cycle
+      return true;
+    });
   }
 
   void _deactivateChild(Element child) {
@@ -873,6 +887,18 @@ abstract class Element<T extends Widget> implements BuildContext {
 
   void dependenciesChanged(Type affectedWidgetType) {
     assert(false);
+  }
+
+  String debugGetOwnershipChain(int limit) {
+    List<String> chain = <String>[];
+    Element node = this;
+    while (chain.length < limit && node != null) {
+      chain.add(node.toStringShort());
+      node = node._parent;
+    }
+    if (node != null)
+      chain.add('\u22EF');
+    return chain.join(' \u2190 ');
   }
 
   String toStringShort() {
@@ -1236,8 +1262,8 @@ class StatefulComponentElement<T extends StatefulComponent, U extends State<T>> 
   }
 }
 
-abstract class ProxyElement<T extends ProxyComponent> extends ComponentElement<T> {
-  ProxyElement(T widget) : super(widget) {
+abstract class _ProxyElement<T extends _ProxyComponent> extends ComponentElement<T> {
+  _ProxyElement(T widget) : super(widget) {
     _builder = (BuildContext context) => this.widget.child;
   }
 
@@ -1255,7 +1281,7 @@ abstract class ProxyElement<T extends ProxyComponent> extends ComponentElement<T
   void notifyDescendants(T oldWidget);
 }
 
-class ParentDataElement extends ProxyElement<ParentDataWidget> {
+class ParentDataElement extends _ProxyElement<ParentDataWidget> {
   ParentDataElement(ParentDataWidget widget) : super(widget);
 
   void mount(Element parent, dynamic slot) {
@@ -1288,7 +1314,7 @@ class ParentDataElement extends ProxyElement<ParentDataWidget> {
 
 
 
-class InheritedElement extends ProxyElement<InheritedWidget> {
+class InheritedElement extends _ProxyElement<InheritedWidget> {
   InheritedElement(InheritedWidget widget) : super(widget);
 
   void notifyDescendants(InheritedWidget oldWidget) {
@@ -1354,15 +1380,7 @@ abstract class RenderObjectElement<T extends RenderObjectWidget> extends Buildab
   }
 
   void debugUpdateRenderObjectOwner() {
-    List<String> chain = <String>[];
-    Element node = this;
-    while (chain.length < 4 && node != null) {
-      chain.add(node.toStringShort());
-      node = node._parent;
-    }
-    if (node != null)
-      chain.add('\u22EF');
-    _renderObject.debugOwner = chain.join(' \u2190 ');
+    _renderObject.debugOwner = debugGetOwnershipChain(4);
   }
 
   void performRebuild() {

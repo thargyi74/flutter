@@ -91,7 +91,7 @@ class OverlayGeometryApp extends StatefulComponent {
 class OverlayGeometryAppState extends State<OverlayGeometryApp> {
 
   static const TextStyle cardLabelStyle =
-    const TextStyle(color: Colors.white, fontSize: 18.0, fontWeight: bold);
+    const TextStyle(color: Colors.white, fontSize: 18.0, fontWeight: FontWeight.bold);
 
   List<CardModel> cardModels;
   Map<MarkerType, Point> markers = new Map<MarkerType, Point>();
@@ -129,7 +129,7 @@ class OverlayGeometryAppState extends State<OverlayGeometryApp> {
       markers[MarkerType.topLeft] = box.localToGlobal(new Point(0.0, 0.0));
       final Size size = box.size;
       markers[MarkerType.bottomRight] = box.localToGlobal(new Point(size.width, size.height));
-      final ScrollableState scrollable = findScrollableAncestor(target.currentContext);
+      final ScrollableState scrollable = Scrollable.of(target.currentContext);
       markersScrollOffset = scrollable.scrollOffset;
     });
   }

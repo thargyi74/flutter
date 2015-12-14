@@ -27,6 +27,11 @@ export 'package:flutter/gestures.dart' show
   GestureScaleUpdateCallback,
   GestureScaleEndCallback;
 
+/// A widget that detects gestures.
+///
+/// Attempts to recognize gestures that correspond to its non-null callbacks.
+///
+/// See http://flutter.io/gestures/ for additional information.
 class GestureDetector extends StatefulComponent {
   const GestureDetector({
     Key key,
@@ -54,20 +59,51 @@ class GestureDetector extends StatefulComponent {
 
   final Widget child;
 
+  /// A pointer that might cause a tap has contacted the screen at a particular
+  /// location.
   final GestureTapDownCallback onTapDown;
+
+  /// A pointer that will trigger a tap has stopped contacting the screen at a
+  /// particular location.
   final GestureTapDownCallback onTapUp;
+
+  /// A tap has occurred.
   final GestureTapCallback onTap;
+
+  /// The pointer that previously triggered the [onTapDown] will not end up
+  /// causing a tap.
   final GestureTapCancelCallback onTapCancel;
+
+  /// The user has tapped the screen at the same location twice in quick
+  /// succession.
   final GestureTapCallback onDoubleTap;
 
+  /// A pointer has remained in contact with the screen at the same location for
+  /// a long period of time.
   final GestureLongPressCallback onLongPress;
 
+  /// A pointer has contacted the screen and might begin to move vertically.
   final GestureDragStartCallback onVerticalDragStart;
+
+  /// A pointer that is in contact with the screen and moving vertically has
+  /// moved in the vertical direction.
   final GestureDragUpdateCallback onVerticalDragUpdate;
+
+  /// A pointer that was previously in contact with the screen and moving
+  /// vertically is no longer in contact with the screen and was moving at a
+  /// specific velocity when it stopped contacting the screen.
   final GestureDragEndCallback onVerticalDragEnd;
 
+  /// A pointer has contacted the screen and might begin to move horizontally.
   final GestureDragStartCallback onHorizontalDragStart;
+
+  /// A pointer that is in contact with the screen and moving horizontally has
+  /// moved in the horizontal direction.
   final GestureDragUpdateCallback onHorizontalDragUpdate;
+
+  /// A pointer that was previously in contact with the screen and moving
+  /// horizontally is no longer in contact with the screen and was moving at a
+  /// specific velocity when it stopped contacting the screen.
   final GestureDragEndCallback onHorizontalDragEnd;
 
   final GesturePanStartCallback onPanStart;
@@ -78,13 +114,14 @@ class GestureDetector extends StatefulComponent {
   final GestureScaleUpdateCallback onScaleUpdate;
   final GestureScaleEndCallback onScaleEnd;
 
+  /// How this gesture detector should behave during hit testing.
   final HitTestBehavior behavior;
 
   _GestureDetectorState createState() => new _GestureDetectorState();
 }
 
 class _GestureDetectorState extends State<GestureDetector> {
-  PointerRouter get _router => FlutterBinding.instance.pointerRouter;
+  PointerRouter get _router => Gesturer.instance.pointerRouter;
 
   TapGestureRecognizer _tap;
   DoubleTapGestureRecognizer _doubleTap;
@@ -128,7 +165,7 @@ class _GestureDetectorState extends State<GestureDetector> {
     if (config.onTapDown == null && config.onTapUp == null && config.onTap == null && config.onTapCancel == null) {
       _tap = _ensureDisposed(_tap);
     } else {
-      _tap ??= new TapGestureRecognizer(router: _router);
+      _tap ??= new TapGestureRecognizer(router: _router, gestureArena: Gesturer.instance.gestureArena);
       _tap
         ..onTapDown = config.onTapDown
         ..onTapUp = config.onTapUp
@@ -141,7 +178,7 @@ class _GestureDetectorState extends State<GestureDetector> {
     if (config.onDoubleTap == null) {
       _doubleTap = _ensureDisposed(_doubleTap);
     } else {
-      _doubleTap ??= new DoubleTapGestureRecognizer(router: _router);
+      _doubleTap ??= new DoubleTapGestureRecognizer(router: _router, gestureArena: Gesturer.instance.gestureArena);
       _doubleTap.onDoubleTap = config.onDoubleTap;
     }
   }
@@ -150,7 +187,7 @@ class _GestureDetectorState extends State<GestureDetector> {
     if (config.onLongPress == null) {
       _longPress = _ensureDisposed(_longPress);
     } else {
-      _longPress ??= new LongPressGestureRecognizer(router: _router);
+      _longPress ??= new LongPressGestureRecognizer(router: _router, gestureArena: Gesturer.instance.gestureArena);
       _longPress.onLongPress = config.onLongPress;
     }
   }
@@ -159,7 +196,7 @@ class _GestureDetectorState extends State<GestureDetector> {
     if (config.onVerticalDragStart == null && config.onVerticalDragUpdate == null && config.onVerticalDragEnd == null) {
       _verticalDrag = _ensureDisposed(_verticalDrag);
     } else {
-      _verticalDrag ??= new VerticalDragGestureRecognizer(router: _router);
+      _verticalDrag ??= new VerticalDragGestureRecognizer(router: _router, gestureArena: Gesturer.instance.gestureArena);
       _verticalDrag
         ..onStart = config.onVerticalDragStart
         ..onUpdate = config.onVerticalDragUpdate
@@ -171,7 +208,7 @@ class _GestureDetectorState extends State<GestureDetector> {
     if (config.onHorizontalDragStart == null && config.onHorizontalDragUpdate == null && config.onHorizontalDragEnd == null) {
       _horizontalDrag = _ensureDisposed(_horizontalDrag);
     } else {
-      _horizontalDrag ??= new HorizontalDragGestureRecognizer(router: _router);
+      _horizontalDrag ??= new HorizontalDragGestureRecognizer(router: _router, gestureArena: Gesturer.instance.gestureArena);
       _horizontalDrag
         ..onStart = config.onHorizontalDragStart
         ..onUpdate = config.onHorizontalDragUpdate
@@ -184,7 +221,7 @@ class _GestureDetectorState extends State<GestureDetector> {
       _pan = _ensureDisposed(_pan);
     } else {
       assert(_scale == null);  // Scale is a superset of pan; just use scale
-      _pan ??= new PanGestureRecognizer(router: _router);
+      _pan ??= new PanGestureRecognizer(router: _router, gestureArena: Gesturer.instance.gestureArena);
       _pan
         ..onStart = config.onPanStart
         ..onUpdate = config.onPanUpdate
@@ -197,7 +234,7 @@ class _GestureDetectorState extends State<GestureDetector> {
       _scale = _ensureDisposed(_scale);
     } else {
       assert(_pan == null);  // Scale is a superset of pan; just use scale
-      _scale ??= new ScaleGestureRecognizer(router: _router);
+      _scale ??= new ScaleGestureRecognizer(router: _router, gestureArena: Gesturer.instance.gestureArena);
       _scale
         ..onStart = config.onScaleStart
         ..onUpdate = config.onScaleUpdate
