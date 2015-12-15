@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:den_api/den_api.dart';
 import 'package:path/path.dart' as path;
 
 import '../artifacts.dart';
@@ -95,10 +96,13 @@ class AnalyzeCommand extends FlutterCommand {
 
       // .../packages/*/bin/*.dart
       // .../packages/*/lib/main.dart
+      // .../packages/*/test/*_test.dart
+      // .../packages/*/test/*/*_test.dart
       Directory packages = new Directory(path.join(ArtifactStore.flutterRoot, 'packages'));
       for (FileSystemEntity entry in packages.listSync()) {
         if (entry is Directory) {
           bool foundOne = false;
+
           Directory binDirectory = new Directory(path.join(entry.path, 'bin'));
           if (binDirectory.existsSync()) {
             for (FileSystemEntity subentry in binDirectory.listSync()) {
@@ -108,11 +112,30 @@ class AnalyzeCommand extends FlutterCommand {
               }
             }
           }
+
           String mainPath = path.join(entry.path, 'lib', 'main.dart');
           if (FileSystemEntity.isFileSync(mainPath)) {
             dartFiles.add(mainPath);
             foundOne = true;
           }
+
+          Directory testDirectory = new Directory(path.join(entry.path, 'test'));
+          if (testDirectory.existsSync()) {
+            for (FileSystemEntity entry in testDirectory.listSync()) {
+              if (entry is Directory) {
+                for (FileSystemEntity subentry in entry.listSync()) {
+                  if (subentry is File && subentry.path.endsWith('_test.dart')) {
+                    dartFiles.add(subentry.path);
+                    foundTest = true;
+                  }
+                }
+              } else if (entry is File && entry.path.endsWith('_test.dart')) {
+                dartFiles.add(entry.path);
+                foundTest = true;
+              }
+            }
+          }
+
           if (foundOne)
             pubSpecDirectories.add(entry.path);
         }
@@ -157,6 +180,18 @@ class AnalyzeCommand extends FlutterCommand {
     Map<String, String> packages = <String, String>{};
     bool hadInconsistentRequirements = false;
     for (Directory directory in pubSpecDirectories.map((path) => new Directory(path))) {
+      String pubSpecYamlPath = path.join(directory.path, 'pubspec.yaml');
+      File pubSpecYamlFile = new File(pubSpecYamlPath);
+      if (pubSpecYamlFile.existsSync()) {
+        Pubspec pubSpecYaml = await Pubspec.load(pubSpecYamlPath);
+        String packageName = pubSpecYaml.name;
+        String packagePath = path.normalize(path.absolute(path.join(directory.path, 'lib')));
+        if (packages.containsKey(packageName) && packages[packageName] != packagePath) {
+          logging.warning('Inconsistent requirements for $packageName; using $packagePath (and not ${packages[packageName]}).');
+          hadInconsistentRequirements = true;
+        }
+        packages[packageName] = packagePath;
+      }
       File dotPackages = new File(path.join(directory.path, '.packages'));
       if (dotPackages.existsSync()) {
         Map<String, String> dependencies = <String, String>{};

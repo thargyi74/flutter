@@ -21,11 +21,12 @@ flutter test --flutter-repo
 
 if [ $TRAVIS_PULL_REQUEST = "false" ]; then
   if [ $TRAVIS_BRANCH = "master" ]; then
-    (cd packages/flutter; dartdoc)
+    (cd packages/flutter; dartdoc --header=doc/styles.html)
 
     GSUTIL=$HOME/google-cloud-sdk/bin/gsutil
     GCLOUD=$HOME/google-cloud-sdk/bin/gcloud
     $GCLOUD auth activate-service-account --key-file gcloud_key_file.json
-    $GSUTIL -m rsync -r -d packages/flutter/doc/api gs://docs.domokit.org/flutter
+    $GSUTIL -m -q rsync -r -d packages/flutter/doc/api gs://docs.flutter.io/flutter
+    $GSUTIL -m -q rsync -r -d packages/flutter/doc/api gs://docs.domokit.org/flutter
   fi
 fi
