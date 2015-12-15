@@ -18,7 +18,7 @@
     <uses-permission android:name="org.domokit.sky.shell.permission.C2D_MESSAGE" />
     <!-- end for GCM -->
 
-    <application android:icon="@mipmap/ic_launcher" android:label="Fitness" android:name="org.domokit.sky.shell.SkyApplication">
+    <application android:icon="@mipmap/ic_launcher" android:label="Fitness" android:name="org.domokit.fitness.FitnessApplication">
         <activity android:configChanges="orientation|keyboardHidden|keyboard|screenSize" android:hardwareAccelerated="true" android:launchMode="singleTask" android:name="org.domokit.sky.shell.SkyActivity" android:theme="@android:style/Theme.Black.NoTitleBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
